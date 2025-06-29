@@ -119,7 +119,7 @@ pull_docker_images() {
     docker pull quay.io/keycloak/keycloak:26.0.4
     
     echo "Pulling keycloak-config-cli image..."
-    docker pull adorsys/keycloak-config-cli:latest
+    docker pull adorsys/keycloak-config-cli:6.2.0
     
     print_status "Docker images pulled successfully"
 }

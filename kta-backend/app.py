@@ -20,7 +20,7 @@ app = Flask(__name__)
 
 # Configuration
 KEYCLOAK_CONFIGS_REPO_PATH = os.getenv('KEYCLOAK_CONFIGS_REPO_PATH', '/app/keycloak-configs')
-TENANT_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'tenant-template-working.yaml')
+TENANT_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'tenant-template.yaml')
 TENANTS_DIR = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, 'tenants')
 
 # Ensure directories exist
@@ -129,7 +129,7 @@ def index():
   "message": "Tenant acme_corp signup completed successfully",
   "tenant_id": "acme_corp",
   "tenant_name": "ACME Corporation",
-  "initial_admin_username": "admin@acme_corp",
+  "initial_admin_username": "admin-acme_corp",
   "initial_admin_password": "SecurePassword123!",
   "keycloak_realm_url": "http://localhost:8080/realms/acme_corp",
   "config_file": "tenants/acme_corp.yaml",
@@ -237,7 +237,7 @@ def signup_tenant():
             "message": f"Tenant {tenant_id} signup completed successfully",
             "tenant_id": tenant_id,
             "tenant_name": tenant_name,
-            "initial_admin_username": f"admin@{tenant_id}",
+            "initial_admin_username": f"admin-{tenant_id}",
             "initial_admin_password": initial_password,
             "keycloak_realm_url": f"http://localhost:8080/realms/{tenant_id}",
             "config_file": f"tenants/{tenant_id}.yaml",

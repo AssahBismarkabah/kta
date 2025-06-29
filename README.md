@@ -18,7 +18,7 @@ This project demonstrates:
 
 ## 🏗️ Architecture
 
-![KTA Architecture](architecture.puml)
+![KTA Architecture](./docs/image.png)
 
 The KTA system consists of four main components working together in a GitOps workflow.
 
