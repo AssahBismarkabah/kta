@@ -1,7 +1,7 @@
 # Tenant Realm Template for kta
 # This template is used to create isolated Keycloak realms for each tenant
 # Variables: test_corp, Test Corporation, ^ujqLnc0%E6XYvNw
-# Last updated: Testing CI/CD pipeline trigger
+# Last trigger: Testing CI/CD pipeline trigger
 
 realm: "test_corp"
 enabled: true
