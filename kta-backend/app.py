@@ -20,7 +20,7 @@ app = Flask(__name__)
 
 # Configuration
 KEYCLOAK_CONFIGS_REPO_PATH = os.getenv('KEYCLOAK_CONFIGS_REPO_PATH', '/app/keycloak-configs')
-TENANT_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'tenant-template-minimal.yaml')
+TENANT_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'tenant-template-working.yaml')
 TENANTS_DIR = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, 'tenants')
 
 # Ensure directories exist
@@ -430,5 +430,4 @@ if __name__ == '__main__':
         except subprocess.CalledProcessError as e:
             print(f" Failed to initialize Git repository: {e}")
     
-    # Run the Flask app
     app.run(host='0.0.0.0', port=5001, debug=True)

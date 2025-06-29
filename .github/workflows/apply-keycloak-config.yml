@@ -1,0 +1,192 @@
+name: Apply Keycloak Tenant Configurations
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'tenants/**/*.yaml'
+      - 'tenants/**/*.yml'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      tenant_id:
+        description: 'Specific tenant ID to deploy (optional - leave empty for all)'
+        required: false
+        type: string
+
+jobs:
+  validate-configs:
+    name: Validate Configuration Files
+    runs-on: ubuntu-latest
+    outputs:
+      configs-valid: ${{ steps.validate.outputs.valid }}
+      tenant-files: ${{ steps.find-files.outputs.files }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install PyYAML
+        run: pip install PyYAML
+      
+      - name: Find tenant configuration files
+        id: find-files
+        run: |
+          if [ -n "${{ github.event.inputs.tenant_id }}" ]; then
+            # Manual trigger with specific tenant
+            if [ -f "tenants/${{ github.event.inputs.tenant_id }}.yaml" ]; then
+              echo "files=tenants/${{ github.event.inputs.tenant_id }}.yaml" >> $GITHUB_OUTPUT
+            elif [ -f "tenants/${{ github.event.inputs.tenant_id }}.yml" ]; then
+              echo "files=tenants/${{ github.event.inputs.tenant_id }}.yml" >> $GITHUB_OUTPUT
+            else
+              echo "Error: Tenant configuration file not found for ${{ github.event.inputs.tenant_id }}"
+              exit 1
+            fi
+          else
+            # Find all changed or existing tenant files
+            files=$(find tenants -name "*.yaml" -o -name "*.yml" 2>/dev/null | tr '\n' ' ' || echo "")
+            echo "files=$files" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Validate YAML syntax
+        id: validate
+        run: |
+          valid=true
+          files="${{ steps.find-files.outputs.files }}"
+          
+          if [ -z "$files" ]; then
+            echo "No tenant configuration files found"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          for file in $files; do
+            if [ -f "$file" ]; then
+              echo "Validating $file..."
+              if ! python -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null; then
+                echo "YAML syntax error in $file"
+                valid=false
+              else
+                echo "$file is valid"
+              fi
+            fi
+          done
+          
+          echo "valid=$valid" >> $GITHUB_OUTPUT
+          
+          if [ "$valid" = "false" ]; then
+            echo " Configuration validation failed"
+            exit 1
+          else
+            echo "All configurations are valid"
+          fi
+
+  deploy-to-keycloak:
+    name: Deploy Configurations to Keycloak
+    runs-on: ubuntu-latest
+    needs: validate-configs
+    if: needs.validate-configs.outputs.configs-valid == 'true'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Create temporary config directory
+        run: |
+          mkdir -p /tmp/keycloak-configs
+          files="${{ needs.validate-configs.outputs.tenant-files }}"
+          for file in $files; do
+            if [ -f "$file" ]; then
+              cp "$file" /tmp/keycloak-configs/
+              echo "Copied $file to temporary directory"
+            fi
+          done
+          ls -la /tmp/keycloak-configs/
+      
+      - name: Apply Keycloak Configurations
+        run: |
+          docker run --rm \
+            -v /tmp/keycloak-configs:/config \
+            -e KEYCLOAK_URL="${{ secrets.KEYCLOAK_URL }}" \
+            -e KEYCLOAK_USER="${{ secrets.KEYCLOAK_ADMIN_USER }}" \
+            -e KEYCLOAK_PASSWORD="${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}" \
+            -e KEYCLOAK_AVAILABILITYCHECK_ENABLED=true \
+            -e KEYCLOAK_AVAILABILITYCHECK_TIMEOUT=120s \
+            -e IMPORT_FILES_LOCATIONS='/config/*.yaml,/config/*.yml' \
+            -e IMPORT_VAR_SUBSTITUTION_ENABLED=false \
+            -e IMPORT_CACHE_ENABLED=false \
+                          adorsys/keycloak-config-cli:latest
+      
+      - name: Verify deployment
+        run: |
+          echo "Keycloak configuration deployment completed successfully"
+          
+          # Optional: Add verification steps here
+          # For example, check if realms were created by calling Keycloak API
+          
+          files="${{ needs.validate-configs.outputs.tenant-files }}"
+          echo "📋 Deployed configurations:"
+          for file in $files; do
+            if [ -f "$file" ]; then
+              tenant_id=$(basename "$file" .yaml | sed 's/.yml$//')
+              echo "  - Tenant: $tenant_id (from $file)"
+              echo "    Realm URL: ${{ secrets.KEYCLOAK_URL }}/realms/$tenant_id"
+              echo "    Admin Console: ${{ secrets.KEYCLOAK_URL }}/admin/master/console/#/$tenant_id"
+            fi
+          done
+
+  notify-completion:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [validate-configs, deploy-to-keycloak]
+    if: always()
+    
+    steps:
+      - name: Deployment Success Notification
+        if: needs.deploy-to-keycloak.result == 'success'
+        run: |
+          echo " Keycloak tenant configurations deployed successfully!"
+          echo " Deployment Summary:"
+          echo "  - Repository: ${{ github.repository }}"
+          echo "  - Branch: ${{ github.ref_name }}"
+          echo "  - Commit: ${{ github.sha }}"
+          echo "  - Triggered by: ${{ github.actor }}"
+          echo "  - Files processed: ${{ needs.validate-configs.outputs.tenant-files }}"
+      
+      - name: Deployment Failure Notification
+        if: needs.validate-configs.result == 'failure' || needs.deploy-to-keycloak.result == 'failure'
+        run: |
+          echo " Keycloak configuration deployment failed!"
+          echo " Failure Details:"
+          echo "  - Repository: ${{ github.repository }}"
+          echo "  - Branch: ${{ github.ref_name }}"
+          echo "  - Commit: ${{ github.sha }}"
+          echo "  - Validation Status: ${{ needs.validate-configs.result }}"
+          echo "  - Deployment Status: ${{ needs.deploy-to-keycloak.result }}"
+          
+          # In a real scenario, you might want to:
+          # - Send Slack/Teams notifications
+          # - Create GitHub issues
+          # - Send emails to administrators
+          # - Update monitoring dashboards
+          
+          exit 1
+
+# Security note: This workflow requires the following secrets to be configured:
+# - KEYCLOAK_URL: The URL of your Keycloak instance (e.g., https://keycloak.example.com)
+# - KEYCLOAK_ADMIN_USER: Keycloak admin username
+# - KEYCLOAK_ADMIN_PASSWORD: Keycloak admin password
+#
+# For production use, consider:
+# - Using service accounts instead of admin credentials
+# - Implementing proper secret rotation
+# - Adding approval workflows for production deployments
+# - Using environment-specific configurations
