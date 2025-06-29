@@ -123,7 +123,7 @@ jobs:
             -e IMPORT_FILES_LOCATIONS='/config/*.yaml,/config/*.yml' \
             -e IMPORT_VAR_SUBSTITUTION_ENABLED=false \
             -e IMPORT_CACHE_ENABLED=false \
-            adorsys/keycloak-config-cli:6.4.0
+            adorsys/keycloak-config-cli:latest
       
       - name: Verify deployment
         run: |
