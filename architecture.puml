@@ -1,0 +1,91 @@
+@startuml KTA Architecture
+
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam component {
+    BackgroundColor #E8F4FD
+    BorderColor #2E86AB
+    FontColor #333333
+}
+skinparam database {
+    BackgroundColor #FFF2CC
+    BorderColor #D6B656
+}
+skinparam cloud {
+    BackgroundColor #F8CECC
+    BorderColor #B85450
+}
+skinparam actor {
+    BackgroundColor #D5E8D4
+    BorderColor #82B366
+}
+
+title KTA - GitOps-Driven Keycloak Automation
+
+actor "Users" as user
+actor "DevOps" as devops
+
+package "KTA System" {
+    component "Backend API" as api {
+        [Flask App] as flask
+        [Signup] as signup
+        [Config Gen] as generator
+        [Git Ops] as gitops
+        [Template] as template
+    }
+    
+    database "Git Repo" as git {
+        [Templates] as templates
+        [Configs] as configs
+        [Pipeline] as pipeline
+        [History] as history
+    }
+    
+    component "Automation" as engine {
+        [config-cli] as cli
+        [Validator] as validator
+        [State Mgr] as state
+        [Docker] as docker
+    }
+    
+    cloud "Keycloak" as keycloak {
+        [Server] as identity
+        [Realms] as realms
+        [Clients] as clients
+        [Users] as users
+        [Roles] as roles
+        [Admin] as admin
+    }
+}
+
+package "External" {
+    component "GitHub Actions" as github
+    component "Monitoring" as monitoring
+    component "Notifications" as notification
+}
+
+' Main user flow
+user --> signup : "signup"
+signup --> git : "generate config"
+git --> github : "trigger CI/CD"
+github --> cli : "deploy"
+cli --> identity : "create realm"
+identity --> user : "access realm"
+
+' Management flow
+devops --> git : "manage templates"
+monitoring --> devops : "alerts"
+
+' Notes
+note right of git : "Source of truth"
+note right of cli : "YAML to Keycloak"
+note right of identity : "Multi-tenant"
+
+' Tech stack
+note top of flask : "Flask"
+note top of git : "Git+YAML"
+note top of cli : "config-cli"
+note top of identity : "Keycloak"
+
+@enduml 

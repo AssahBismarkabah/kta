@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.4
+    container_name: kta-keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin123
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+    ports:
+      - "8080:8080"
+    command: start-dev
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    networks:
+      - kta-network
+
+  kta-backend:
+    build: ./kta-backend
+    container_name: kta-backend
+    ports:
+      - "5001:5001"
+    environment:
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_ADMIN_USER=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin123
+      - KEYCLOAK_CONFIGS_REPO_PATH=/app/keycloak-configs
+    volumes:
+      - ./keycloak-configs:/app/keycloak-configs
+      - ./kta-backend:/app
+    depends_on:
+      - keycloak
+    networks:
+      - kta-network
+
+volumes:
+  keycloak_data:
+
+networks:
+  kta-network:
+    driver: bridge

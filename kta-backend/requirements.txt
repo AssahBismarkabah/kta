@@ -1,0 +1,18 @@
+# Flask web framework - updated to latest secure versions
+Flask==3.0.3
+Werkzeug==3.0.3
+
+# Template engine - updated for security
+Jinja2==3.1.4
+
+# YAML processing - updated for security fixes
+PyYAML==6.0.2
+
+# HTTP client - updated for security
+requests==2.32.3
+
+# Production WSGI server - updated
+gunicorn==22.0.0
+
+# Development and debugging - updated
+python-dotenv==1.0.1
