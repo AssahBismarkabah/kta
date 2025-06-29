@@ -103,16 +103,28 @@ jobs:
         run: |
           mkdir -p /tmp/keycloak-configs
           files="${{ needs.validate-configs.outputs.tenant-files }}"
+          echo "📋 Files to process: $files"
+          
           for file in $files; do
             if [ -f "$file" ]; then
-              cp "$file" /tmp/keycloak-configs/
-              echo "Copied $file to temporary directory"
+              filename=$(basename "$file")
+              cp "$file" "/tmp/keycloak-configs/$filename"
+              echo "Copied $file → /tmp/keycloak-configs/$filename"
+            else
+              echo "File not found: $file"
             fi
           done
+          
+          echo "Contents of /tmp/keycloak-configs/:"
           ls -la /tmp/keycloak-configs/
+          echo "File count: $(ls -1 /tmp/keycloak-configs/*.yaml /tmp/keycloak-configs/*.yml 2>/dev/null | wc -l)"
       
       - name: Apply Keycloak Configurations
         run: |
+          echo "Starting Keycloak configuration deployment..."
+          echo "Available files in /config:"
+          ls -la /tmp/keycloak-configs/
+          
           docker run --rm \
             -v /tmp/keycloak-configs:/config \
             -e KEYCLOAK_URL="${{ secrets.KEYCLOAK_URL || 'http://localhost:8080' }}" \
@@ -120,9 +132,10 @@ jobs:
             -e KEYCLOAK_PASSWORD="${{ secrets.KEYCLOAK_ADMIN_PASSWORD || 'admin123' }}" \
             -e KEYCLOAK_AVAILABILITYCHECK_ENABLED=true \
             -e KEYCLOAK_AVAILABILITYCHECK_TIMEOUT=120s \
-            -e IMPORT_FILES_LOCATIONS='/config/*.yaml,/config/*.yml' \
+            -e IMPORT_FILES_LOCATIONS='/config' \
             -e IMPORT_VAR_SUBSTITUTION_ENABLED=false \
             -e IMPORT_CACHE_ENABLED=false \
+            -e LOGGING_LEVEL_KEYCLOAKCONFIGCLI=INFO \
             adorsys/keycloak-config-cli:latest
       
       - name: Verify deployment
