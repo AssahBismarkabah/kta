@@ -6,8 +6,8 @@ on:
       - main
       - master
     paths:
-      - 'tenants/**/*.yaml'
-      - 'tenants/**/*.yml'
+      - 'keycloak-configs/tenants/**/*.yaml'
+      - 'keycloak-configs/tenants/**/*.yml'
   
   # Allow manual triggering
   workflow_dispatch:
@@ -42,17 +42,17 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.tenant_id }}" ]; then
             # Manual trigger with specific tenant
-            if [ -f "tenants/${{ github.event.inputs.tenant_id }}.yaml" ]; then
-              echo "files=tenants/${{ github.event.inputs.tenant_id }}.yaml" >> $GITHUB_OUTPUT
-            elif [ -f "tenants/${{ github.event.inputs.tenant_id }}.yml" ]; then
-              echo "files=tenants/${{ github.event.inputs.tenant_id }}.yml" >> $GITHUB_OUTPUT
+            if [ -f "keycloak-configs/tenants/${{ github.event.inputs.tenant_id }}.yaml" ]; then
+              echo "files=keycloak-configs/tenants/${{ github.event.inputs.tenant_id }}.yaml" >> $GITHUB_OUTPUT
+            elif [ -f "keycloak-configs/tenants/${{ github.event.inputs.tenant_id }}.yml" ]; then
+              echo "files=keycloak-configs/tenants/${{ github.event.inputs.tenant_id }}.yml" >> $GITHUB_OUTPUT
             else
               echo "Error: Tenant configuration file not found for ${{ github.event.inputs.tenant_id }}"
               exit 1
             fi
           else
             # Find all changed or existing tenant files
-            files=$(find tenants -name "*.yaml" -o -name "*.yml" 2>/dev/null | tr '\n' ' ' || echo "")
+            files=$(find keycloak-configs/tenants -name "*.yaml" -o -name "*.yml" 2>/dev/null | tr '\n' ' ' || echo "")
             echo "files=$files" >> $GITHUB_OUTPUT
           fi
       
@@ -115,15 +115,15 @@ jobs:
         run: |
           docker run --rm \
             -v /tmp/keycloak-configs:/config \
-            -e KEYCLOAK_URL="${{ secrets.KEYCLOAK_URL }}" \
-            -e KEYCLOAK_USER="${{ secrets.KEYCLOAK_ADMIN_USER }}" \
-            -e KEYCLOAK_PASSWORD="${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}" \
+            -e KEYCLOAK_URL="${{ secrets.KEYCLOAK_URL || 'http://localhost:8080' }}" \
+            -e KEYCLOAK_USER="${{ secrets.KEYCLOAK_ADMIN_USER || 'admin' }}" \
+            -e KEYCLOAK_PASSWORD="${{ secrets.KEYCLOAK_ADMIN_PASSWORD || 'admin123' }}" \
             -e KEYCLOAK_AVAILABILITYCHECK_ENABLED=true \
             -e KEYCLOAK_AVAILABILITYCHECK_TIMEOUT=120s \
             -e IMPORT_FILES_LOCATIONS='/config/*.yaml,/config/*.yml' \
             -e IMPORT_VAR_SUBSTITUTION_ENABLED=false \
             -e IMPORT_CACHE_ENABLED=false \
-                          adorsys/keycloak-config-cli:latest
+            adorsys/keycloak-config-cli:6.4.0
       
       - name: Verify deployment
         run: |
