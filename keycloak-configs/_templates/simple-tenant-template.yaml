@@ -1,1 +1,93 @@
- 
+# Simple Tenant Template for {{TENANT_ID}}
+# This template is optimized for working user creation with keycloak-config-cli
+
+id: "{{TENANT_ID}}"
+realm: "{{TENANT_ID}}"
+displayName: "{{TENANT_NAME}} Services"
+enabled: true
+
+# Minimal realm settings for successful user creation
+loginTheme: "keycloak"
+adminTheme: "keycloak"
+accountTheme: "keycloak"
+emailTheme: "keycloak"
+
+# Basic password policy (same as working_demo)
+passwordPolicy: "length(8)"
+
+# Authentication settings (same as working_demo)
+registrationAllowed: false
+rememberMe: true
+verifyEmail: false
+loginWithEmailAllowed: true
+duplicateEmailsAllowed: false
+resetPasswordAllowed: true
+
+# Session timeouts (same as working_demo)
+ssoSessionIdleTimeout: 1800
+ssoSessionMaxLifespan: 36000
+
+# Realm roles
+roles:
+  realm:
+    - name: "admin"
+      description: "Administrator role for {{TENANT_NAME}}"
+    - name: "user"
+      description: "Standard user role for {{TENANT_NAME}}"
+
+# Client configuration (simplified like working_demo)
+clients:
+  - clientId: "{{TENANT_ID}}-app"
+    name: "{{TENANT_NAME}} Application"
+    enabled: true
+    publicClient: true
+    directAccessGrantsEnabled: true
+    standardFlowEnabled: true
+    protocol: "openid-connect"
+    webOrigins:
+      - "http://localhost:3000"
+    redirectUris:
+      - "http://localhost:3000/*"
+
+# Groups configuration
+groups:
+  - name: "Administrators"
+    path: "/Administrators"
+    realmRoles:
+      - "admin"
+  - name: "Users"
+    path: "/Users"
+    realmRoles:
+      - "user"
+
+# User configuration - THIS SHOULD WORK NOW!
+users:
+  - username: "admin-{{TENANT_ID}}"
+    email: "admin@{{TENANT_ID}}.example.com"
+    firstName: "{{TENANT_NAME}}"
+    lastName: "Administrator"
+    enabled: true
+    emailVerified: true
+    credentials:
+      - type: "password"
+        value: "{{ADMIN_PASSWORD}}"
+        temporary: false
+    realmRoles:
+      - "admin"
+    groups:
+      - "/Administrators"
+  
+  - username: "user-{{TENANT_ID}}"
+    email: "user@{{TENANT_ID}}.example.com"
+    firstName: "Test"
+    lastName: "User"
+    enabled: true
+    emailVerified: true
+    credentials:
+      - type: "password"
+        value: "TestUser123!"
+        temporary: false
+    realmRoles:
+      - "user"
+    groups:
+      - "/Users" 

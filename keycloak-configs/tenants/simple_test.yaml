@@ -1,0 +1,125 @@
+# Simple Tenant Template for simple_test
+# This template is optimized for working user creation with keycloak-config-cli
+
+id: "simple_test"
+realm: "simple_test"
+displayName: "Simple Test Corp Services"
+enabled: true
+
+# Minimal realm settings for successful user creation
+loginTheme: "keycloak"
+adminTheme: "keycloak"
+accountTheme: "keycloak"
+emailTheme: "keycloak"
+
+# Basic configuration without complex policies
+passwordPolicy: "length(8)"
+registrationAllowed: false
+registrationEmailAsUsername: false
+rememberMe: true
+verifyEmail: false
+loginWithEmailAllowed: true
+duplicateEmailsAllowed: false
+resetPasswordAllowed: true
+
+# Minimal session settings
+ssoSessionIdleTimeout: 1800  # 30 minutes
+ssoSessionMaxLifespan: 36000  # 10 hours
+offlineSessionIdleTimeout: 2592000  # 30 days
+
+# Basic security settings
+bruteForceProtected: true
+permanentLockout: false
+maxFailureWaitSeconds: 900
+minimumQuickLoginWaitSeconds: 60
+waitIncrementSeconds: 60
+quickLoginCheckMilliSeconds: 1000
+maxDeltaTimeSeconds: 43200
+failureFactor: 30
+
+# Realm roles
+roles:
+  realm:
+    - name: "admin"
+      description: "Administrator role for Simple Test Corp"
+    - name: "user"
+      description: "Standard user role for Simple Test Corp"
+    - name: "manager"
+      description: "Manager role for Simple Test Corp"
+
+# Client configuration
+clients:
+  - clientId: "simple_test-app"
+    name: "Simple Test Corp Application"
+    description: "Main application client for Simple Test Corp"
+    enabled: true
+    publicClient: true
+    directAccessGrantsEnabled: true
+    standardFlowEnabled: true
+    implicitFlowEnabled: false
+    serviceAccountsEnabled: false
+    protocol: "openid-connect"
+    webOrigins:
+      - "http://localhost:3000"
+      - "https://simple_test.example.com"
+    redirectUris:
+      - "http://localhost:3000/*"
+      - "https://simple_test.example.com/*"
+    defaultClientScopes:
+      - "profile"
+      - "email"
+      - "roles"
+    optionalClientScopes:
+      - "address"
+      - "phone"
+
+# Groups configuration
+groups:
+  - name: "Administrators"
+    path: "/Administrators"
+    realmRoles:
+      - "admin"
+  - name: "Users"
+    path: "/Users"
+    realmRoles:
+      - "user"
+  - name: "Managers"
+    path: "/Managers"
+    realmRoles:
+      - "manager"
+
+# User configuration - this works with the simple template!
+users:
+  - username: "admin-simple_test"
+    email: "admin@simple_test.example.com"
+    firstName: "Simple Test Corp"
+    lastName: "Administrator"
+    enabled: true
+    emailVerified: true
+    credentials:
+      - type: "password"
+        value: "eWwVZq1IW1RnWy^j"
+        temporary: false
+    realmRoles:
+      - "admin"
+    groups:
+      - "/Administrators"
+  
+  - username: "user-simple_test"
+    email: "user@simple_test.example.com"
+    firstName: "Test"
+    lastName: "User"
+    enabled: true
+    emailVerified: true
+    credentials:
+      - type: "password"
+        value: "TestUser123!"
+        temporary: false
+    realmRoles:
+      - "user"
+    groups:
+      - "/Users"
+
+# Default groups for new users
+defaultGroups:
+  - "/Users" 

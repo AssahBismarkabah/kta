@@ -42,3 +42,4 @@ volumes:
 networks:
   kta-network:
     driver: bridge
+ 

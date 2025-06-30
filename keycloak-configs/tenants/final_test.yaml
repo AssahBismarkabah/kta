@@ -1,21 +1,21 @@
-# Working Demo Tenant - Minimal Configuration for User Creation
-# Users can be created successfully and authentication works
+# Simple Tenant Template for final_test
+# This template is optimized for working user creation with keycloak-config-cli
 
-id: "working_demo"
-realm: "working_demo"
-displayName: "Working Demo Services"
+id: "final_test"
+realm: "final_test"
+displayName: "Final Security Test Services"
 enabled: true
 
-# Minimal realm settings
+# Minimal realm settings for successful user creation
 loginTheme: "keycloak"
 adminTheme: "keycloak"
 accountTheme: "keycloak"
 emailTheme: "keycloak"
 
-# Basic password policy
+# Basic password policy (same as working_demo)
 passwordPolicy: "length(8)"
 
-# Authentication settings
+# Authentication settings (same as working_demo)
 registrationAllowed: false
 rememberMe: true
 verifyEmail: false
@@ -23,7 +23,7 @@ loginWithEmailAllowed: true
 duplicateEmailsAllowed: false
 resetPasswordAllowed: true
 
-# Session timeouts
+# Session timeouts (same as working_demo)
 ssoSessionIdleTimeout: 1800
 ssoSessionMaxLifespan: 36000
 
@@ -31,14 +31,14 @@ ssoSessionMaxLifespan: 36000
 roles:
   realm:
     - name: "admin"
-      description: "Administrator role"
+      description: "Administrator role for Final Security Test"
     - name: "user"
-      description: "Standard user role"
+      description: "Standard user role for Final Security Test"
 
-# Client
+# Client configuration (simplified like working_demo)
 clients:
-  - clientId: "working-demo-app"
-    name: "Working Demo Application"
+  - clientId: "final_test-app"
+    name: "Final Security Test Application"
     enabled: true
     publicClient: true
     directAccessGrantsEnabled: true
@@ -49,7 +49,7 @@ clients:
     redirectUris:
       - "http://localhost:3000/*"
 
-# Groups
+# Groups configuration
 groups:
   - name: "Administrators"
     path: "/Administrators"
@@ -60,32 +60,32 @@ groups:
     realmRoles:
       - "user"
 
-# Users - THIS WORKS!
+# User configuration - THIS SHOULD WORK NOW!
 users:
-  - username: "admin-demo"
-    email: "admin@workingdemo.com"
-    firstName: "Demo"
+  - username: "admin-final_test"
+    email: "admin@final_test.example.com"
+    firstName: "Final Security Test"
     lastName: "Administrator"
     enabled: true
     emailVerified: true
     credentials:
       - type: "password"
-        value: "AdminDemo123!"
+        value: "7u6Y5n^QL$%U3NGs"
         temporary: false
     realmRoles:
       - "admin"
     groups:
       - "/Administrators"
   
-  - username: "user-demo"
-    email: "user@workingdemo.com"
-    firstName: "Demo"
+  - username: "user-final_test"
+    email: "user@final_test.example.com"
+    firstName: "Test"
     lastName: "User"
     enabled: true
     emailVerified: true
     credentials:
       - type: "password"
-        value: "UserDemo123!"
+        value: "TestUser123!"
         temporary: false
     realmRoles:
       - "user"

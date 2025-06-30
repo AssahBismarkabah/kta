@@ -205,8 +205,10 @@ def index():
                         if (data.tenants && data.tenants.length > 0) {
                             tenantsDiv.innerHTML = data.tenants.map(t => 
                                 `<div class="tenant-item">
-                                    <strong>${t}</strong> 
-                                    <a href="/api/tenants/${t}" target="_blank" style="margin-left: 10px;">View Config</a>
+                                    <strong>${t.tenant_id}</strong> 
+                                    ${t.tenant_name ? `- ${t.tenant_name}` : ''}
+                                    <small style="color: #666; margin-left: 10px;">(${t.created_at ? new Date(t.created_at).toLocaleDateString() : 'Unknown'})</small>
+                                    <a href="/api/tenants/${t.tenant_id}" target="_blank" style="margin-left: 10px;">View Config</a>
                                 </div>`
                             ).join('');
                         } else {
@@ -258,12 +260,22 @@ def index():
                                 <h3>Tenant Created Successfully!</h3>
                                 <p><strong>Tenant ID:</strong> ${result.tenant_id}</p>
                                 <p><strong>Template:</strong> ${result.template_type} (${result.template_features})</p>
-                                <p><strong>Admin Username:</strong> <code>${result.initial_admin_username}</code></p>
-                                <p><strong>Admin Password:</strong> <code>${result.initial_admin_password}</code></p>
                                 <p><strong>Config File:</strong> ${result.config_file}</p>
                                 <p><strong>Git Status:</strong> ${result.git_committed ? 'Committed - Pipeline triggered!' : '⚠️ Local only'}</p>
-                                <p><em> The GitHub Actions pipeline is now deploying your configuration to Keycloak...</em></p>
+                                <p><em>The GitHub Actions pipeline is now deploying your configuration to Keycloak...</em></p>
                                 <p><strong>Realm URL:</strong> <a href="${result.keycloak_realm_url}" target="_blank">${result.keycloak_realm_url}</a></p>
+                                <div style="background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 15px; border-radius: 4px; margin-top: 15px;">
+                                    <h4>Security Notice</h4>
+                                    <p><strong>Admin credentials have been generated but are not displayed for security.</strong></p>
+                                    <p>To access your realm:</p>
+                                    <ol>
+                                        <li>Go to <a href="http://localhost:8080/admin" target="_blank">Keycloak Admin Console</a></li>
+                                        <li>Login with: admin / admin123</li>
+                                        <li>Select realm: <strong>${result.tenant_id}</strong></li>
+                                        <li>Create users manually via Users → Add User</li>
+                                    </ol>
+                                    <p><em>Manual user creation is the industry standard for security.</em></p>
+                                </div>
                             </div>
                         `;
                         // Clear form and reload tenant list
@@ -364,18 +376,17 @@ def signup_tenant():
         # Perform Git operations
         git_success, git_error = git_operations(tenant_id, "add")
         
-        # Prepare response
+        # Prepare response (credentials excluded for security)
         response_data = {
             "message": f"Tenant {tenant_id} signup completed successfully",
             "tenant_id": tenant_id,
             "tenant_name": tenant_name,
             "template_type": template_type,
             "template_features": "User creation + basic features" if template_type == 'simple' else "All advanced keycloak-config-cli features",
-            "initial_admin_username": f"admin-{tenant_id}" if template_type == 'simple' else f"admin-{tenant_id}",
-            "initial_admin_password": initial_password,
             "keycloak_realm_url": f"http://localhost:8080/realms/{tenant_id}",
             "config_file": f"tenants/{tenant_id}.yaml",
             "git_committed": git_success,
+            "security_notice": "Admin credentials generated but not returned for security. Create users manually via Keycloak Admin Console.",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         

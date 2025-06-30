@@ -385,3 +385,4 @@ if [ "$CLEANUP_ONLY" = true ]; then
 else
     run_demo
 fi
+ 
