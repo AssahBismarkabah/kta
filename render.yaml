@@ -42,7 +42,7 @@ services:
       - key: KC_DB_USERNAME
         fromDatabase:
           name: kta-postgres
-          property: username
+          property: user
       - key: KC_DB_PASSWORD
         fromDatabase:
           name: kta-postgres
