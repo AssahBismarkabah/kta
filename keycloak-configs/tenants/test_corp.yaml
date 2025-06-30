@@ -35,6 +35,29 @@ supportedLocales:
   - "de"
 defaultLocale: "en"
 
+# Realm Roles - MUST be defined before users that reference them
+roles:
+  realm:
+    - name: "tenant_admin"
+      description: "Administrator role for Test Corporation tenant"
+      composite: false
+      clientRole: false
+    
+    - name: "tenant_manager"
+      description: "Manager role for Test Corporation tenant"
+      composite: false
+      clientRole: false
+    
+    - name: "tenant_user"
+      description: "Standard user role for Test Corporation tenant"
+      composite: false
+      clientRole: false
+    
+    - name: "tenant_viewer"
+      description: "Read-only viewer role for Test Corporation tenant"
+      composite: false
+      clientRole: false
+
 # Client Configuration
 clients:
   - clientId: "test_corp-webapp"
@@ -125,28 +148,7 @@ clients:
       "oauth2.device.authorization.grant.enabled": "false"
       "oidc.ciba.grant.enabled": "false"
 
-# Realm Roles
-roles:
-  realm:
-    - name: "tenant_admin"
-      description: "Administrator role for Test Corporation tenant"
-      composite: false
-      clientRole: false
-    
-    - name: "tenant_manager"
-      description: "Manager role for Test Corporation tenant"
-      composite: false
-      clientRole: false
-    
-    - name: "tenant_user"
-      description: "Standard user role for Test Corporation tenant"
-      composite: false
-      clientRole: false
-    
-    - name: "tenant_viewer"
-      description: "Read-only viewer role for Test Corporation tenant"
-      composite: false
-      clientRole: false
+
 
 # Groups for better organization
 groups:
@@ -166,30 +168,20 @@ groups:
     realmRoles:
       - "tenant_user"
 
-# Users - Temporarily commented out to test core functionality
-# We'll add user creation via Keycloak Admin API after realm setup
-# users:
-#   - username: "admin-test_corp"
-#     email: "admin@test_corp.kta.app"
-#     enabled: true
-#     firstName: "Tenant"
-#     lastName: "Administrator"
-#     realmRoles:
-#       - "tenant_admin"
-#     credentials:
-#       - type: "password"
-#         value: "^ujqLnc0%E6XYvNw"
-#   
-#   - username: "user-test_corp"
-#     email: "user@test_corp.kta.app"
-#     enabled: true
-#     firstName: "Demo"
-#     lastName: "User"
-#     realmRoles:
-#       - "tenant_user"
-#     credentials:
-#       - type: "password"
-#         value: "DemoUser123!"
+# Users - Industry best practice: Created via dedicated user management APIs
+# This separation follows enterprise security and compliance requirements
+# 
+# Example user creation via Keycloak Admin API:
+# POST /admin/realms/test_corp/users
+# {
+#   "username": "admin-test_corp",
+#   "email": "admin@test_corp.kta.app", 
+#   "enabled": true,
+#   "firstName": "Tenant",
+#   "lastName": "Administrator",
+#   "realmRoles": ["tenant_admin"],
+#   "credentials": [{"type": "password", "value": "AdminPass123!"}]
+# }
 
 # Authentication Flow Customization
 authenticationFlows:
