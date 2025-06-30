@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: kta-backend
+    env: docker
+    dockerfilePath: ./kta-backend/Dockerfile
+    rootDir: ./kta-backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 5001
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_REPO
+        sync: false
+      - key: KEYCLOAK_CONFIGS_REPO_PATH
+        value: /app/keycloak-configs
+
+  - type: web
+    name: kta-keycloak
+    env: docker
+    dockerfilePath: ./Dockerfile.keycloak
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: KEYCLOAK_ADMIN
+        sync: false
+      - key: KEYCLOAK_ADMIN_PASSWORD
+        sync: false
+      - key: KC_DB_URL
+        fromDatabase:
+          name: kta-postgres
+          property: connectionString
+      - key: KC_HOSTNAME
+        value: ${RENDER_EXTERNAL_HOSTNAME}
+
+databases:
+  - name: kta-postgres
+    plan: free

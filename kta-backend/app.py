@@ -20,11 +20,38 @@ app = Flask(__name__)
 
 # Configuration
 KEYCLOAK_CONFIGS_REPO_PATH = os.getenv('KEYCLOAK_CONFIGS_REPO_PATH', '/app/keycloak-configs')
+GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
+GITHUB_REPO = os.getenv('GITHUB_REPO')
+PORT = int(os.getenv('PORT', 5001))
+
 TENANT_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'tenant-template.yaml')
+SIMPLE_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'simple-tenant-template.yaml')
 TENANTS_DIR = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, 'tenants')
 
 # Ensure directories exist
 os.makedirs(TENANTS_DIR, exist_ok=True)
+
+def setup_git_credentials():
+    """Setup git credentials for authenticated push operations"""
+    if GITHUB_TOKEN and GITHUB_REPO:
+        try:
+            # Configure git to use token for authentication
+            repo_url = f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"
+            subprocess.run([
+                "git", "-C", KEYCLOAK_CONFIGS_REPO_PATH,
+                "remote", "set-url", "origin", repo_url
+            ], capture_output=True, text=True)
+            app.logger.info("Git credentials configured successfully")
+            return True
+        except Exception as e:
+            app.logger.warning(f"Failed to setup git credentials: {e}")
+            return False
+    else:
+        app.logger.warning("GITHUB_TOKEN or GITHUB_REPO not set - Git push may fail")
+        return False
+
+# Setup git credentials on startup
+setup_git_credentials()
 
 def generate_secure_password(length=16):
     """Generate a secure random password"""
@@ -72,15 +99,17 @@ def git_operations(tenant_id, action="add"):
                 "commit", "-m", commit_message
             ], check=True, capture_output=True, text=True)
             
-            # Push to remote (if configured)
-            try:
-                subprocess.run([
-                    "git", "-C", KEYCLOAK_CONFIGS_REPO_PATH,
-                    "push"
-                ], check=True, capture_output=True, text=True)
-            except subprocess.CalledProcessError:
-                # Push might fail if no remote is configured (local development)
-                app.logger.warning("Git push failed - might be running in local mode")
+            # Push to remote
+            push_result = subprocess.run([
+                "git", "-C", KEYCLOAK_CONFIGS_REPO_PATH,
+                "push", "origin", "main"
+            ], capture_output=True, text=True)
+            
+            if push_result.returncode != 0:
+                app.logger.warning(f"Git push failed: {push_result.stderr}")
+                if not GITHUB_TOKEN or not GITHUB_REPO:
+                    app.logger.info("Git push failed - check GITHUB_TOKEN and GITHUB_REPO environment variables")
+                return True, "Committed locally but push failed - check Git configuration"
         
         return True, None
     
@@ -91,89 +120,170 @@ def git_operations(tenant_id, action="add"):
 
 @app.route('/')
 def index():
-    """Landing page with API documentation"""
+    """Landing page with tenant creation UI"""
     html_template = """
     <!DOCTYPE html>
     <html>
     <head>
-        <title>kta Backend - Keycloak Tenant Automation</title>
+        <title>KTA - Keycloak Tenant Automation</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-            .container { max-width: 800px; margin: 0 auto; }
-            .endpoint { background: #f4f4f4; padding: 15px; margin: 10px 0; border-radius: 5px; }
-            .method { color: #fff; padding: 3px 8px; border-radius: 3px; font-weight: bold; }
-            .post { background: #28a745; }
-            .get { background: #007bff; }
-            .delete { background: #dc3545; }
-            code { background: #f8f9fa; padding: 2px 4px; border-radius: 3px; }
-            pre { background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', roboto, oxygen, ubuntu, cantarell, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .header { text-align: center; margin-bottom: 30px; }
+            .form-group { margin-bottom: 20px; }
+            label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; }
+            input[type="text"], select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
+            input[type="text"]:focus, select:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 2px rgba(0,123,255,0.25); }
+            .btn { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 600; }
+            .btn:hover { background: #0056b3; }
+            .btn:disabled { background: #6c757d; cursor: not-allowed; }
+            .result { margin-top: 20px; padding: 15px; border-radius: 4px; }
+            .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+            .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+            .loading { background: #cce7ff; border: 1px solid #b3d9ff; color: #004085; }
+            .template-info { background: #e2e3e5; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+            .tenants-list { margin-top: 30px; }
+            .tenant-item { background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 4px; border-left: 4px solid #007bff; }
+            small { color: #666; font-size: 14px; }
+            .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>🚀 kta Backend</h1>
-            <p>GitOps-driven Keycloak tenant automation service</p>
-            
-            <h2>📋 API Endpoints</h2>
-            
-            <div class="endpoint">
-                <h3><span class="method post">POST</span> /api/tenants/signup</h3>
-                <p>Create a new tenant and generate Keycloak realm configuration</p>
-                <h4>Request Body:</h4>
-                <pre>{
-  "tenant_id": "acme_corp",
-  "tenant_name": "ACME Corporation"
-}</pre>
-                <h4>Response:</h4>
-                <pre>{
-  "message": "Tenant acme_corp signup completed successfully",
-  "tenant_id": "acme_corp",
-  "tenant_name": "ACME Corporation",
-  "initial_admin_username": "admin-acme_corp",
-  "initial_admin_password": "SecurePassword123!",
-  "keycloak_realm_url": "http://localhost:8080/realms/acme_corp",
-  "config_file": "tenants/acme_corp.yaml",
-  "git_committed": true
-}</pre>
+            <div class="header">
+                <h1> KTA - Keycloak Tenant Automation</h1>
+                <p>Create and deploy Keycloak tenant configurations with GitOps</p>
             </div>
             
-            <div class="endpoint">
-                <h3><span class="method get">GET</span> /api/tenants</h3>
-                <p>List all existing tenants</p>
+            <div class="template-info">
+                <h3> Template Options:</h3>
+                <p><strong>Simple Template:</strong> Basic realm with working user creation (recommended for demos)</p>
+                <p><strong>Complex Template:</strong> Full-featured realm with all advanced Keycloak capabilities</p>
             </div>
             
-            <div class="endpoint">
-                <h3><span class="method get">GET</span> /api/tenants/{tenant_id}</h3>
-                <p>Get information about a specific tenant</p>
+            <form id="tenantForm">
+                <div class="form-group">
+                    <label for="tenant_id">Tenant ID:</label>
+                    <input type="text" id="tenant_id" name="tenant_id" placeholder="e.g., acme_corp, demo_company" required>
+                    <small>Only letters, numbers, hyphens, and underscores. 3-50 characters.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="tenant_name">Tenant Name:</label>
+                    <input type="text" id="tenant_name" name="tenant_name" placeholder="e.g., ACME Corporation" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="template_type">Template Type:</label>
+                    <select id="template_type" name="template_type">
+                        <option value="simple">Simple Template (with user creation)</option>
+                        <option value="complex">Complex Template (all features)</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn" id="submitBtn">🚀 Create Tenant</button>
+            </form>
+            
+            <div id="result"></div>
+            
+            <div class="tenants-list">
+                <h2> Recent Tenants</h2>
+                <div id="tenants">Loading...</div>
             </div>
-            
-            <div class="endpoint">
-                <h3><span class="method delete">DELETE</span> /api/tenants/{tenant_id}</h3>
-                <p>Remove a tenant configuration (for cleanup/testing)</p>
-            </div>
-            
-            <h2>🔧 Usage Example</h2>
-            <pre>curl -X POST http://localhost:5001/api/tenants/signup \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "tenant_id": "demo_company",
-    "tenant_name": "Demo Company Inc"
-  }'</pre>
-            
-            <h2> System Status</h2>
-            <p><strong>Template Path:</strong> <code>{{ template_path }}</code></p>
-            <p><strong>Tenants Directory:</strong> <code>{{ tenants_dir }}</code></p>
-            <p><strong>Git Repository:</strong> <code>{{ repo_path }}</code></p>
         </div>
+        
+        <script>
+            // Load existing tenants on page load
+            loadTenants();
+            
+            function loadTenants() {
+                fetch('/api/tenants')
+                    .then(response => response.json())
+                    .then(data => {
+                        const tenantsDiv = document.getElementById('tenants');
+                        if (data.tenants && data.tenants.length > 0) {
+                            tenantsDiv.innerHTML = data.tenants.map(t => 
+                                `<div class="tenant-item">
+                                    <strong>${t}</strong> 
+                                    <a href="/api/tenants/${t}" target="_blank" style="margin-left: 10px;">View Config</a>
+                                </div>`
+                            ).join('');
+                        } else {
+                            tenantsDiv.innerHTML = '<p>No tenants created yet. Create your first tenant above!</p>';
+                        }
+                    })
+                    .catch(error => {
+                        document.getElementById('tenants').innerHTML = '<p>Error loading tenants.</p>';
+                    });
+            }
+            
+            // Handle form submission
+            document.getElementById('tenantForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const submitBtn = document.getElementById('submitBtn');
+                const resultDiv = document.getElementById('result');
+                
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner"></span> Creating...';
+                resultDiv.innerHTML = '<div class="result loading">Creating tenant configuration and triggering deployment...</div>';
+                
+                const formData = new FormData(e.target);
+                const data = {
+                    tenant_id: formData.get('tenant_id'),
+                    tenant_name: formData.get('tenant_name'),
+                    template_type: formData.get('template_type')
+                };
+                
+                fetch('/api/tenants/signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.json())
+                .then(result => {
+                    // Reset button
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Create Tenant';
+                    
+                    if (result.error) {
+                        resultDiv.innerHTML = `<div class="result error"><strong>Error:</strong> ${result.error}</div>`;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="result success">
+                                <h3>Tenant Created Successfully!</h3>
+                                <p><strong>Tenant ID:</strong> ${result.tenant_id}</p>
+                                <p><strong>Template:</strong> ${result.template_type} (${result.template_features})</p>
+                                <p><strong>Admin Username:</strong> <code>${result.initial_admin_username}</code></p>
+                                <p><strong>Admin Password:</strong> <code>${result.initial_admin_password}</code></p>
+                                <p><strong>Config File:</strong> ${result.config_file}</p>
+                                <p><strong>Git Status:</strong> ${result.git_committed ? 'Committed - Pipeline triggered!' : '⚠️ Local only'}</p>
+                                <p><em> The GitHub Actions pipeline is now deploying your configuration to Keycloak...</em></p>
+                                <p><strong>Realm URL:</strong> <a href="${result.keycloak_realm_url}" target="_blank">${result.keycloak_realm_url}</a></p>
+                            </div>
+                        `;
+                        // Clear form and reload tenant list
+                        e.target.reset();
+                        setTimeout(loadTenants, 1000);
+                    }
+                })
+                .catch(error => {
+                    // Reset button
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Create Tenant';
+                    resultDiv.innerHTML = `<div class="result error"><strong>Network Error:</strong> ${error.message}</div>`;
+                });
+            });
+        </script>
     </body>
     </html>
     """
     
-    return render_template_string(html_template,
-        template_path=TENANT_TEMPLATE_PATH,
-        tenants_dir=TENANTS_DIR,
-        repo_path=KEYCLOAK_CONFIGS_REPO_PATH
-    )
+    return render_template_string(html_template)
 
 @app.route('/api/tenants/signup', methods=['POST'])
 def signup_tenant():
@@ -186,11 +296,18 @@ def signup_tenant():
         
         tenant_id = data.get('tenant_id', '').strip().lower()
         tenant_name = data.get('tenant_name', '').strip()
+        template_type = data.get('template_type', 'complex').strip().lower()  # 'complex' or 'simple'
         
         # Validate input
         if not tenant_id or not tenant_name:
             return jsonify({
                 "error": "Both tenant_id and tenant_name are required"
+            }), 400
+        
+        # Validate template type
+        if template_type not in ['complex', 'simple']:
+            return jsonify({
+                "error": "template_type must be 'complex' or 'simple'"
             }), 400
         
         # Validate tenant ID format
@@ -207,22 +324,37 @@ def signup_tenant():
         # Generate secure initial password
         initial_password = generate_secure_password()
         
+        # Select template based on type
+        if template_type == 'simple':
+            template_path = SIMPLE_TEMPLATE_PATH
+        else:
+            template_path = TENANT_TEMPLATE_PATH  # complex template
+        
         # Read and process template
-        if not os.path.exists(TENANT_TEMPLATE_PATH):
+        if not os.path.exists(template_path):
             return jsonify({
-                "error": f"Tenant template not found at {TENANT_TEMPLATE_PATH}"
+                "error": f"Template not found at {template_path}"
             }), 500
         
-        with open(TENANT_TEMPLATE_PATH, 'r') as f:
+        with open(template_path, 'r') as f:
             template_content = f.read()
         
         # Use Jinja2 for template substitution
         template = Template(template_content)
-        config_content = template.render(
-            tenant_id=tenant_id,
-            tenant_name=tenant_name,
-            initial_admin_password=initial_password
-        )
+        if template_type == 'simple':
+            # Simple template uses different variable names
+            config_content = template.render(
+                TENANT_ID=tenant_id,
+                TENANT_NAME=tenant_name,
+                ADMIN_PASSWORD=initial_password
+            )
+        else:
+            # Complex template uses original variable names
+            config_content = template.render(
+                tenant_id=tenant_id,
+                tenant_name=tenant_name,
+                initial_admin_password=initial_password
+            )
         
         # Save tenant configuration
         tenant_config_path = os.path.join(TENANTS_DIR, f"{tenant_id}.yaml")
@@ -237,7 +369,9 @@ def signup_tenant():
             "message": f"Tenant {tenant_id} signup completed successfully",
             "tenant_id": tenant_id,
             "tenant_name": tenant_name,
-            "initial_admin_username": f"admin-{tenant_id}",
+            "template_type": template_type,
+            "template_features": "User creation + basic features" if template_type == 'simple' else "All advanced keycloak-config-cli features",
+            "initial_admin_username": f"admin-{tenant_id}" if template_type == 'simple' else f"admin-{tenant_id}",
             "initial_admin_password": initial_password,
             "keycloak_realm_url": f"http://localhost:8080/realms/{tenant_id}",
             "config_file": f"tenants/{tenant_id}.yaml",
@@ -405,7 +539,15 @@ def health_check():
         "service": "kta-backend",
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "template_exists": os.path.exists(TENANT_TEMPLATE_PATH),
-        "tenants_dir_exists": os.path.exists(TENANTS_DIR)
+        "simple_template_exists": os.path.exists(SIMPLE_TEMPLATE_PATH),
+        "tenants_dir_exists": os.path.exists(TENANTS_DIR),
+        "git_configured": bool(GITHUB_TOKEN and GITHUB_REPO),
+        "environment": {
+            "PORT": PORT,
+            "GITHUB_REPO": GITHUB_REPO,
+            "GITHUB_TOKEN_SET": bool(GITHUB_TOKEN),
+            "REPO_PATH": KEYCLOAK_CONFIGS_REPO_PATH
+        }
     })
 
 if __name__ == '__main__':
@@ -430,4 +572,4 @@ if __name__ == '__main__':
         except subprocess.CalledProcessError as e:
             print(f" Failed to initialize Git repository: {e}")
     
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=PORT, debug=False)
