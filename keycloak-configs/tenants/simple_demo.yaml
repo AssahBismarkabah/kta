@@ -1,9 +1,9 @@
-# Simple Tenant Template for {{TENANT_ID}}
+# Simple Tenant Template for simple_demo
 # This template is optimized for working user creation with keycloak-config-cli
 
-id: "{{TENANT_ID}}"
-realm: "{{TENANT_ID}}"
-displayName: "{{TENANT_NAME}} Services"
+id: "simple_demo"
+realm: "simple_demo"
+displayName: "Simple Demo Company Services"
 enabled: true
 
 # Minimal realm settings for successful user creation
@@ -31,14 +31,14 @@ ssoSessionMaxLifespan: 36000
 roles:
   realm:
     - name: "admin"
-      description: "Administrator role for {{TENANT_NAME}}"
+      description: "Administrator role for Simple Demo Company"
     - name: "user"
-      description: "Standard user role for {{TENANT_NAME}}"
+      description: "Standard user role for Simple Demo Company"
 
 # Client configuration (simplified like working_demo)
 clients:
-  - clientId: "{{TENANT_ID}}-app"
-    name: "{{TENANT_NAME}} Application"
+  - clientId: "simple_demo-app"
+    name: "Simple Demo Company Application"
     enabled: true
     publicClient: true
     directAccessGrantsEnabled: true
@@ -62,22 +62,23 @@ groups:
 
 # User configuration - THIS SHOULD WORK NOW!
 users:
-  - username: "admin-{{TENANT_ID}}"
-    email: "admin@{{TENANT_ID}}.example.com"
-    firstName: "{{TENANT_NAME}}"
+  - username: "admin-simple_demo"
+    email: "admin@simple_demo.example.com"
+    firstName: "Simple Demo Company"
     lastName: "Administrator"
     enabled: true
     emailVerified: true
     credentials:
       - type: "password"
-        value: "{{ADMIN_PASSWORD}}"
+        value: "#Y1rVk@WZL#dp2!U"
+        temporary: false
     realmRoles:
       - "admin"
     groups:
       - "/Administrators"
   
-  - username: "user-{{TENANT_ID}}"
-    email: "user@{{TENANT_ID}}.example.com"
+  - username: "user-simple_demo"
+    email: "user@simple_demo.example.com"
     firstName: "Test"
     lastName: "User"
     enabled: true
@@ -85,6 +86,7 @@ users:
     credentials:
       - type: "password"
         value: "TestUser123!"
+        temporary: false
     realmRoles:
       - "user"
     groups:

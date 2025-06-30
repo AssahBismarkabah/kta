@@ -55,7 +55,8 @@ setup_git_credentials()
 
 def generate_secure_password(length=16):
     """Generate a secure random password"""
-    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    # Use only alphanumeric plus basic special characters that don't cause issues
+    alphabet = string.ascii_letters + string.digits + "!@#$"
     password = ''.join(secrets.choice(alphabet) for _ in range(length))
     return password
 
