@@ -29,12 +29,20 @@ services:
         sync: false
       - key: KC_DB_URL
         value: ${POSTGRES_URL}?sslmode=require
-      - key: KC_HOSTNAME_URL
-        value: https://kta-keycloak.onrender.com
-      - key: KC_HOSTNAME_ADMIN_URL
-        value: https://kta-keycloak.onrender.com
+      - key: KC_HOSTNAME
+        value: kta-keycloak.onrender.com
       - key: KC_HTTP_PORT
         value: 8080
+      - key: KC_HEALTH_ENABLED
+        value: "true"
+      - key: KC_PROXY
+        value: edge
+      - key: KC_HTTP_ENABLED
+        value: "true"
+      - key: KC_HOSTNAME_STRICT
+        value: "false"
+      - key: KC_HOSTNAME_STRICT_HTTPS
+        value: "false"
 
 databases:
   - name: kta-postgres
