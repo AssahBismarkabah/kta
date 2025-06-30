@@ -1,9 +1,8 @@
 services:
   - type: web
     name: kta-backend
-    env: docker
-    dockerfilePath: ./kta-backend/Dockerfile
-    rootDir: ./kta-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile.backend
     plan: free
     healthCheckPath: /health
     envVars:
@@ -18,7 +17,7 @@ services:
 
   - type: web
     name: kta-keycloak
-    env: docker
+    runtime: docker
     dockerfilePath: ./Dockerfile.keycloak
     plan: free
     healthCheckPath: /health
