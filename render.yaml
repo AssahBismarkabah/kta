@@ -5,6 +5,7 @@ services:
     dockerfilePath: ./Dockerfile.backend
     plan: free
     healthCheckPath: /health
+    startCommand: python app.py
     envVars:
       - key: PORT
         value: 5001
@@ -26,12 +27,30 @@ services:
         sync: false
       - key: KEYCLOAK_ADMIN_PASSWORD
         sync: false
-      - key: KC_DB_URL
+      - key: KC_DB_URL_HOST
         fromDatabase:
           name: kta-postgres
-          property: connectionString
+          property: host
+      - key: KC_DB_URL_PORT
+        fromDatabase:
+          name: kta-postgres
+          property: port
+      - key: KC_DB_URL_DATABASE
+        fromDatabase:
+          name: kta-postgres
+          property: database
+      - key: KC_DB_USERNAME
+        fromDatabase:
+          name: kta-postgres
+          property: username
+      - key: KC_DB_PASSWORD
+        fromDatabase:
+          name: kta-postgres
+          property: password
       - key: KC_HOSTNAME
         value: ${RENDER_EXTERNAL_HOSTNAME}
+      - key: KC_HTTP_PORT
+        value: 8080
 
 databases:
   - name: kta-postgres
