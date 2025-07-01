@@ -21,7 +21,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile.keycloak
     plan: free
-    healthCheckPath: /health/ready
+    healthCheckPath: /health
     envVars:
       - key: KEYCLOAK_ADMIN
         sync: false

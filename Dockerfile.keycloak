@@ -26,4 +26,4 @@ EXPOSE 8080
 
 # Start in production mode with proper configuration
 ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
-CMD ["start", "--optimized", "--http-enabled=true", "--http-port=8080", "--proxy-headers=forwarded", "--cache=local"]
+CMD ["start", "--optimized", "--http-enabled=true", "--http-port=8080", "--proxy-headers=forwarded", "--cache=local", "--health-enabled=true"]
