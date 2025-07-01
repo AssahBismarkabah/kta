@@ -15,103 +15,16 @@ on:
 
 jobs:
   apply-config:
-    runs-on: self-hosted
+    runs-on: self-hosted  # Uses local runner
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Wait for Keycloak to be ready
+      - name: Apply configuration
         run: |
-          echo "Waiting for Keycloak container to be available on the Docker network..."
-          # The docker-compose network is named based on the project directory 'kta'
-          DOCKER_NETWORK="kta_default"
-
-          echo "Checking if Docker network '$DOCKER_NETWORK' exists..."
-          if ! docker network ls | grep -q "$DOCKER_NETWORK"; then
-            echo "Error: Docker network '$DOCKER_NETWORK' not found."
-            echo "Please ensure you have run 'docker-compose up -d' from the 'kta' directory."
-            exit 1
-          fi
-
-          for attempt in {1..60}; do
-            # Use a container on the same network to check for Keycloak's health endpoint
-            if docker run --rm --network=$DOCKER_NETWORK curlimages/curl curl --fail --silent --connect-timeout 5 http://keycloak:8080/realms/master/.well-known/openid_configuration > /dev/null; then
-              echo " Keycloak is ready on network '$DOCKER_NETWORK'!"
-              exit 0
-            else
-              echo "Attempt $attempt/60: Keycloak not reachable at http://keycloak:8080. Waiting 5 seconds..."
-              sleep 5
-            fi
-          done
-          
-          echo " Keycloak failed to become ready after 5 minutes."
-          exit 1
-
-      - name: Apply tenant configurations
-        run: |
-          DOCKER_NETWORK="kta_default"
-          KEYCLOAK_INTERNAL_URL="http://keycloak:8080"
-          
-          echo "🔧 Applying configs using network '$DOCKER_NETWORK' and URL '$KEYCLOAK_INTERNAL_URL'"
-          
-          # Get absolute path for volume mapping
-          WORKSPACE_PATH=$(pwd)
+          # Use the script from the actual KTA directory
+          KTA_DIR="/Users/adorsys123/Desktop/dev1.1/personal/pv1/kta"
           
           if [ -n "${{ github.event.inputs.tenant_file }}" ]; then
-            # Apply specific file if provided via manual trigger
-            TENANT_FILE="${{ github.event.inputs.tenant_file }}"
-            echo "🎯 Applying specific tenant file: $TENANT_FILE"
-            
-            docker run --rm \
-              --network $DOCKER_NETWORK \
-              -e KEYCLOAK_URL=$KEYCLOAK_INTERNAL_URL \
-              -e KEYCLOAK_USER=admin \
-              -e KEYCLOAK_PASSWORD=admin123 \
-              -e IMPORT_FILES_LOCATIONS="/config/tenants/$TENANT_FILE" \
-              -v "$WORKSPACE_PATH/keycloak-configs:/config" \
-              adorsys/keycloak-config-cli:latest
+            # Apply specific file
+            "$KTA_DIR/scripts/apply-config.sh" "${{ github.event.inputs.tenant_file }}"
           else
-            # Apply all tenant files
-            echo " Applying all tenant configurations..."
-            
-            for file in keycloak-configs/tenants/*.yaml; do
-              if [ -f "$file" ]; then
-                filename=$(basename "$file")
-                echo "🎯 Applying: $filename"
-                
-                docker run --rm \
-                  --network $DOCKER_NETWORK \
-                  -e KEYCLOAK_URL=$KEYCLOAK_INTERNAL_URL \
-                  -e KEYCLOAK_USER=admin \
-                  -e KEYCLOAK_PASSWORD=admin123 \
-                  -e IMPORT_FILES_LOCATIONS="/config/tenants/$filename" \
-                  -v "$WORKSPACE_PATH/keycloak-configs:/config" \
-                  adorsys/keycloak-config-cli:latest
-              fi
-            done
-          fi
-
-      - name: Verify realm creation
-        run: |
-          DOCKER_NETWORK="kta_default"
-          KEYCLOAK_INTERNAL_URL="http://keycloak:8080"
-
-          echo " Verifying realm creation on network '$DOCKER_NETWORK'..."
-          
-          # Use a container to get an access token
-          ACCESS_TOKEN=$(docker run --rm --network=$DOCKER_NETWORK curlimages/curl -s -X POST $KEYCLOAK_INTERNAL_URL/realms/master/protocol/openid-connect/token \
-              -H "Content-Type: application/x-www-form-urlencoded" \
-              -d "username=admin" \
-              -d "password=admin123" \
-              -d "grant_type=password" \
-              -d "client_id=admin-cli" | docker run --rm -i stedolan/jq -r .access_token)
-
-          if [ -z "$ACCESS_TOKEN" ]; then
-            echo " Failed to get Keycloak admin access token."
-            exit 1
-          fi
-          
-          echo "Realms found:"
-          # Use a container to list the realms
-          docker run --rm --network=$DOCKER_NETWORK curlimages/curl -s $KEYCLOAK_INTERNAL_URL/admin/realms \
-            -H "Authorization: Bearer $ACCESS_TOKEN" | docker run --rm -i stedolan/jq '.[] | .realm' 
+            # Apply all files
+            "$KTA_DIR/scripts/apply-config.sh" 
