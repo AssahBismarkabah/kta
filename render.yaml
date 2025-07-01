@@ -28,7 +28,9 @@ services:
       - key: KEYCLOAK_ADMIN_PASSWORD
         sync: false
       - key: KC_DB_URL
-        value: ${POSTGRES_URL}?sslmode=require
+        fromDatabase:
+          name: kta-postgres
+          property: connectionString
       - key: KC_HOSTNAME
         value: kta-keycloak.onrender.com
       - key: KC_HTTP_PORT
