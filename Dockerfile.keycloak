@@ -15,8 +15,7 @@ ENV KC_HTTP_ENABLED=true
 ENV KC_HTTP_PORT=8080
 ENV KC_HEALTH_ENABLED=true
 
-# Hostname configuration (v2) - proper hostname settings for Render
-ENV KC_HOSTNAME=kta-keycloak.onrender.com
+# Hostname configuration - let Render handle hostname dynamically
 ENV KC_HOSTNAME_STRICT=false
 
 # Clustering configuration - disable for single instance
