@@ -18,9 +18,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Apply configuration
-        shell: bash
         run: |
-          #!/bin/bash
           set -e
           
           # Use the script from the actual KTA directory
@@ -45,6 +43,7 @@ jobs:
           
           # Get tenant file from input
           TENANT_FILE="${{ github.event.inputs.tenant_file }}"
+          TENANT_FILE="${TENANT_FILE:-adorsys.yaml}"
           echo "Tenant file: '$TENANT_FILE'"
           
           # Apply configuration
@@ -55,6 +54,4 @@ jobs:
             echo "Applying all files"
             "$KTA_DIR/scripts/apply-config.sh"
           fi
-          
-          # Done
-          echo "Configuration applied successfully!" 
+        shell: bash 
