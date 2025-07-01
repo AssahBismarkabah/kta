@@ -44,6 +44,10 @@ services:
         value: "false"
       - key: KC_CACHE
         value: "local"
+      - key: KC_PROXY_HEADERS
+        value: "forwarded"
+      - key: KC_HTTP_RELATIVE_PATH
+        value: "/"
       - key: KC_DB_POOL_INITIAL_SIZE
         value: "5"
       - key: KC_DB_POOL_MIN_SIZE
