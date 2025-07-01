@@ -32,6 +32,8 @@ services:
         sync: false
       - key: KC_DB_PASSWORD
         sync: false
+      - key: KC_HOSTNAME
+        value: "kta-keycloak.onrender.com"
       - key: KC_HTTP_PORT
         value: 8080
       - key: KC_HEALTH_ENABLED
