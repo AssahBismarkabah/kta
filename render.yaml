@@ -27,26 +27,12 @@ services:
         sync: false
       - key: KEYCLOAK_ADMIN_PASSWORD
         sync: false
-      - key: KC_DB_URL_HOST
-        fromDatabase:
-          name: kta-postgres
-          property: host
-      - key: KC_DB_URL_PORT
-        fromDatabase:
-          name: kta-postgres
-          property: port
-      - key: KC_DB_URL_DATABASE
-        fromDatabase:
-          name: kta-postgres
-          property: database
+      - key: KC_DB_URL
+        sync: false
       - key: KC_DB_USERNAME
-        fromDatabase:
-          name: kta-postgres
-          property: user
+        sync: false
       - key: KC_DB_PASSWORD
-        fromDatabase:
-          name: kta-postgres
-          property: password
+        sync: false
       - key: KC_HOSTNAME
         value: kta-keycloak.onrender.com
       - key: KC_HTTP_PORT
