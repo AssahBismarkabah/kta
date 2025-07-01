@@ -22,9 +22,27 @@ jobs:
           # Use the script from the actual KTA directory
           KTA_DIR="/Users/adorsys123/Desktop/dev1.1/personal/pv1/kta"
           
+          # Debug info
+          echo "Current directory: $(pwd)"
+          echo "KTA directory exists: $(test -d "$KTA_DIR" && echo "yes" || echo "no")"
+          echo "Script exists: $(test -f "$KTA_DIR/scripts/apply-config.sh" && echo "yes" || echo "no")"
+          
+          # Check if script exists
+          if [ ! -f "$KTA_DIR/scripts/apply-config.sh" ]; then
+            echo "Error: Script not found at $KTA_DIR/scripts/apply-config.sh"
+            exit 1
+          fi
+          
+          # Check script permissions
+          if [ ! -x "$KTA_DIR/scripts/apply-config.sh" ]; then
+            echo "Making script executable..."
+            chmod +x "$KTA_DIR/scripts/apply-config.sh"
+          fi
+          
+          # Apply configuration
           if [ -n "${{ github.event.inputs.tenant_file }}" ]; then
-            # Apply specific file
+            echo "Applying specific file: ${{ github.event.inputs.tenant_file }}"
             "$KTA_DIR/scripts/apply-config.sh" "${{ github.event.inputs.tenant_file }}"
           else
-            # Apply all files
+            echo "Applying all files"
             "$KTA_DIR/scripts/apply-config.sh" 
