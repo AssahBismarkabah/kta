@@ -23,42 +23,82 @@ jobs:
       - name: Wait for Keycloak to be ready
         run: |
           echo "Waiting for Keycloak to be available..."
-          until curl -f http://localhost:8080/realms/master/.well-known/openid_configuration; do
-            echo "Keycloak not ready, waiting 5 seconds..."
-            sleep 5
+          echo "Current working directory: $(pwd)"
+          echo "Testing Keycloak connectivity..."
+          
+          # Try different ways to connect to Keycloak
+          for attempt in {1..60}; do
+            if curl -f http://localhost:8080/realms/master/.well-known/openid_configuration > /dev/null 2>&1; then
+              echo "Keycloak is ready!"
+              exit 0
+            elif curl -f http://127.0.0.1:8080/realms/master/.well-known/openid_configuration > /dev/null 2>&1; then
+              echo "Keycloak is ready on 127.0.0.1!"
+              exit 0
+            else
+              echo "Attempt $attempt/60: Keycloak not ready, waiting 5 seconds..."
+              if [ $attempt -eq 10 ]; then
+                echo "Debug: Checking Docker containers..."
+                docker ps | grep keycloak || echo "No keycloak containers found"
+              fi
+              sleep 5
+            fi
           done
-          echo "Keycloak is ready!"
+          
+          echo "Keycloak failed to become ready after 5 minutes"
+          exit 1
 
       - name: Apply tenant configurations
         run: |
+          echo " Current working directory: $(pwd)"
+          echo " Listing keycloak-configs directory:"
+          ls -la keycloak-configs/ || echo "keycloak-configs directory not found"
+          ls -la keycloak-configs/tenants/ || echo "tenants directory not found"
+          
+          # Get absolute path
+          WORKSPACE_PATH=$(pwd)
+          echo " Workspace path: $WORKSPACE_PATH"
+          
           if [ -n "${{ github.event.inputs.tenant_file }}" ]; then
             # Apply specific file if provided via manual trigger
             TENANT_FILE="${{ github.event.inputs.tenant_file }}"
-            echo "Applying specific tenant file: $TENANT_FILE"
+            echo "🎯 Applying specific tenant file: $TENANT_FILE"
+            
+            if [ ! -f "keycloak-configs/tenants/$TENANT_FILE" ]; then
+              echo " File not found: keycloak-configs/tenants/$TENANT_FILE"
+              exit 1
+            fi
+            
+            echo " Running keycloak-config-cli for $TENANT_FILE..."
             docker run --rm \
               --network host \
               -e KEYCLOAK_URL=http://localhost:8080 \
               -e KEYCLOAK_USER=admin \
               -e KEYCLOAK_PASSWORD=admin123 \
               -e IMPORT_FILES_LOCATIONS="/config/tenants/$TENANT_FILE" \
-              -v $(pwd)/keycloak-configs:/config \
+              -v "$WORKSPACE_PATH/keycloak-configs:/config" \
               adorsys/keycloak-config-cli:latest
+            
+            echo "Applied: $TENANT_FILE"
           else
             # Apply all changed files
-            echo "Applying all tenant configurations..."
+            echo " Applying all tenant configurations..."
+            
             for file in keycloak-configs/tenants/*.yaml; do
               if [ -f "$file" ]; then
                 filename=$(basename "$file")
                 echo "Applying: $filename"
+                
+                echo " Running keycloak-config-cli for $filename..."
                 docker run --rm \
                   --network host \
                   -e KEYCLOAK_URL=http://localhost:8080 \
                   -e KEYCLOAK_USER=admin \
                   -e KEYCLOAK_PASSWORD=admin123 \
                   -e IMPORT_FILES_LOCATIONS="/config/tenants/$filename" \
-                  -v $(pwd)/keycloak-configs:/config \
+                  -v "$WORKSPACE_PATH/keycloak-configs:/config" \
                   adorsys/keycloak-config-cli:latest
-                echo "Applied: $filename"
+                
+                echo " Applied: $filename"
               fi
             done
           fi
