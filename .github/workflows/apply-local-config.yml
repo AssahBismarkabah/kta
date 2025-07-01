@@ -15,11 +15,12 @@ on:
 
 jobs:
   apply-config:
-    runs-on: self-hosted  # Uses local runner
+    runs-on: self-hosted
     steps:
       - name: Apply configuration
         shell: bash
         run: |
+          #!/bin/bash
           set -e
           
           # Use the script from the actual KTA directory
@@ -52,4 +53,8 @@ jobs:
             "$KTA_DIR/scripts/apply-config.sh" "$TENANT_FILE"
           else
             echo "Applying all files"
-            "$KTA_DIR/scripts/apply-config.sh" 
+            "$KTA_DIR/scripts/apply-config.sh"
+          fi
+          
+          # Done
+          echo "Configuration applied successfully!" 
