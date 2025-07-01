@@ -20,7 +20,7 @@ services:
     name: kta-keycloak
     runtime: docker
     dockerfilePath: ./Dockerfile.keycloak
-    plan: free
+    plan: free  
     healthCheckPath: /health
     envVars:
       - key: KEYCLOAK_ADMIN

@@ -4,7 +4,7 @@ FROM quay.io/keycloak/keycloak:26.1.0 as builder
 ENV KC_DB=postgres
 ENV KC_HTTP_RELATIVE_PATH=/
 ENV KC_HEALTH_ENABLED=true
-RUN /opt/keycloak/bin/kc.sh build --db=postgres --transaction-xa-enabled=false
+RUN /opt/keycloak/bin/kc.sh build --db=postgres --transaction-xa-enabled=false --health-enabled=true
 
 FROM quay.io/keycloak/keycloak:26.1.0
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
@@ -26,4 +26,4 @@ EXPOSE 8080
 
 # Start in production mode with proper configuration
 ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
-CMD ["start", "--optimized", "--http-enabled=true", "--http-port=8080", "--proxy-headers=forwarded", "--cache=local", "--health-enabled=true"]
+CMD ["start", "--optimized", "--http-enabled=true", "--http-port=8080", "--proxy-headers=forwarded", "--cache=local"]
