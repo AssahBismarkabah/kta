@@ -48,6 +48,10 @@ services:
         value: "forwarded"
       - key: KC_HTTP_RELATIVE_PATH
         value: "/"
+      - key: KC_HOSTNAME_URL
+        value: "https://kta-keycloak.onrender.com"
+      - key: KC_HOSTNAME_ADMIN_URL
+        value: "https://kta-keycloak.onrender.com"
       - key: KC_DB_POOL_INITIAL_SIZE
         value: "5"
       - key: KC_DB_POOL_MIN_SIZE
