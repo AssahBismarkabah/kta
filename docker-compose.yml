@@ -19,7 +19,9 @@ services:
       - kta-network
 
   kta-backend:
-    build: ./kta-backend
+    build:
+      context: .
+      dockerfile: kta-backend/Dockerfile
     container_name: kta-backend
     ports:
       - "5001:5001"

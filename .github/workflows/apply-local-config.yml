@@ -1,0 +1,75 @@
+name: Apply Keycloak Configuration (Local Demo)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'keycloak-configs/tenants/**.yaml'
+  workflow_dispatch:
+    inputs:
+      tenant_file:
+        description: 'Specific tenant file to apply (e.g., revolut.yaml)'
+        required: false
+        type: string
+
+jobs:
+  apply-config:
+    runs-on: self-hosted  # Uses local runner
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for Keycloak to be ready
+        run: |
+          echo "Waiting for Keycloak to be available..."
+          until curl -f http://localhost:8080/realms/master/.well-known/openid_configuration; do
+            echo "Keycloak not ready, waiting 5 seconds..."
+            sleep 5
+          done
+          echo "Keycloak is ready!"
+
+      - name: Apply tenant configurations
+        run: |
+          if [ -n "${{ github.event.inputs.tenant_file }}" ]; then
+            # Apply specific file if provided via manual trigger
+            TENANT_FILE="${{ github.event.inputs.tenant_file }}"
+            echo "Applying specific tenant file: $TENANT_FILE"
+            docker run --rm \
+              --network host \
+              -e KEYCLOAK_URL=http://localhost:8080 \
+              -e KEYCLOAK_USER=admin \
+              -e KEYCLOAK_PASSWORD=admin123 \
+              -e IMPORT_FILES_LOCATIONS="/config/tenants/$TENANT_FILE" \
+              -v $(pwd)/keycloak-configs:/config \
+              adorsys/keycloak-config-cli:latest
+          else
+            # Apply all changed files
+            echo "Applying all tenant configurations..."
+            for file in keycloak-configs/tenants/*.yaml; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                echo "Applying: $filename"
+                docker run --rm \
+                  --network host \
+                  -e KEYCLOAK_URL=http://localhost:8080 \
+                  -e KEYCLOAK_USER=admin \
+                  -e KEYCLOAK_PASSWORD=admin123 \
+                  -e IMPORT_FILES_LOCATIONS="/config/tenants/$filename" \
+                  -v $(pwd)/keycloak-configs:/config \
+                  adorsys/keycloak-config-cli:latest
+                echo "Applied: $filename"
+              fi
+            done
+          fi
+
+      - name: Verify realm creation
+        run: |
+          echo "Fetching all realms to verify configuration..."
+          curl -s http://localhost:8080/admin/realms \
+            -H "Authorization: Bearer $(curl -s -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -d "username=admin" \
+              -d "password=admin123" \
+              -d "grant_type=password" \
+              -d "client_id=admin-cli" | jq -r .access_token)" | jq '.[] | .realm' 
