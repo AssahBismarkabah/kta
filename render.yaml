@@ -21,7 +21,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile.keycloak
     plan: free
-    healthCheckPath: /health
+    healthCheckPath: /health/ready
     envVars:
       - key: KEYCLOAK_ADMIN
         sync: false
@@ -35,14 +35,12 @@ services:
         value: 8080
       - key: KC_HEALTH_ENABLED
         value: "true"
-      - key: KC_PROXY
-        value: edge
       - key: KC_HTTP_ENABLED
         value: "true"
       - key: KC_HOSTNAME_STRICT
         value: "false"
-      - key: KC_HOSTNAME_STRICT_HTTPS
-        value: "false"
+      - key: KC_CACHE
+        value: "local"
 
 databases:
   - name: kta-postgres
