@@ -19,5 +19,5 @@ jobs:
         run: |
           set -e
           # The KTA_DIR is set inside the script based on its own location
-          ./kta/scripts/apply-organizations.sh
+          ./scripts/apply-organizations.sh
         shell: bash
