@@ -50,12 +50,10 @@ def setup_git_credentials():
         app.logger.warning("GITHUB_TOKEN or GITHUB_REPO not set - Git push may fail")
         return False
 
-# Setup git credentials on startup
 setup_git_credentials()
 
 def generate_secure_password(length=16):
     """Generate a secure random password"""
-    # Use only alphanumeric plus basic special characters that don't cause issues
     alphabet = string.ascii_letters + string.digits + "!@#$"
     password = ''.join(secrets.choice(alphabet) for _ in range(length))
     return password
@@ -87,13 +85,11 @@ def git_operations(tenant_id, action="add"):
         tenant_filename = f"{tenant_id}.yaml"
         
         if action == "add":
-            # Add the new tenant file
             subprocess.run([
                 "git", "-C", KEYCLOAK_CONFIGS_REPO_PATH, 
                 "add", f"tenants/{tenant_filename}"
             ], check=True, capture_output=True, text=True)
             
-            # Commit the changes
             commit_message = f"feat: Add tenant configuration for {tenant_id}"
             subprocess.run([
                 "git", "-C", KEYCLOAK_CONFIGS_REPO_PATH,
@@ -311,39 +307,32 @@ def signup_tenant():
         tenant_name = data.get('tenant_name', '').strip()
         template_type = data.get('template_type', 'complex').strip().lower()  # 'complex' or 'simple'
         
-        # Validate input
         if not tenant_id or not tenant_name:
             return jsonify({
                 "error": "Both tenant_id and tenant_name are required"
             }), 400
         
-        # Validate template type
         if template_type not in ['complex', 'simple']:
             return jsonify({
                 "error": "template_type must be 'complex' or 'simple'"
             }), 400
         
-        # Validate tenant ID format
         is_valid, error_msg = validate_tenant_id(tenant_id)
         if not is_valid:
             return jsonify({"error": error_msg}), 400
         
-        # Check if tenant already exists
         if check_tenant_exists(tenant_id):
             return jsonify({
                 "error": f"Tenant '{tenant_id}' already exists"
             }), 409
         
-        # Generate secure initial password
         initial_password = generate_secure_password()
         
-        # Select template based on type
         if template_type == 'simple':
             template_path = SIMPLE_TEMPLATE_PATH
         else:
             template_path = TENANT_TEMPLATE_PATH  # complex template
         
-        # Read and process template
         if not os.path.exists(template_path):
             return jsonify({
                 "error": f"Template not found at {template_path}"
@@ -352,24 +341,20 @@ def signup_tenant():
         with open(template_path, 'r') as f:
             template_content = f.read()
         
-        # Use Jinja2 for template substitution
         template = Template(template_content)
         if template_type == 'simple':
-            # Simple template uses different variable names
             config_content = template.render(
                 TENANT_ID=tenant_id,
                 TENANT_NAME=tenant_name,
                 ADMIN_PASSWORD=initial_password
             )
         else:
-            # Complex template uses original variable names
             config_content = template.render(
                 tenant_id=tenant_id,
                 tenant_name=tenant_name,
                 initial_admin_password=initial_password
             )
         
-        # Save tenant configuration
         tenant_config_path = os.path.join(TENANTS_DIR, f"{tenant_id}.yaml")
         with open(tenant_config_path, 'w') as f:
             f.write(config_content)
@@ -377,7 +362,6 @@ def signup_tenant():
         # Perform Git operations
         git_success, git_error = git_operations(tenant_id, "add")
         
-        # Prepare response (credentials excluded for security)
         response_data = {
             "message": f"Tenant {tenant_id} signup completed successfully",
             "tenant_id": tenant_id,
@@ -416,11 +400,9 @@ def list_tenants():
                     tenant_id = filename[:-5]  # Remove .yaml extension
                     tenant_path = os.path.join(TENANTS_DIR, filename)
                     
-                    # Get file modification time
                     mtime = os.path.getmtime(tenant_path)
                     created_at = datetime.fromtimestamp(mtime).isoformat() + "Z"
                     
-                    # Try to extract tenant name from config
                     tenant_name = None
                     try:
                         with open(tenant_path, 'r') as f:
@@ -460,7 +442,6 @@ def get_tenant(tenant_id):
         if not os.path.exists(tenant_config_path):
             return jsonify({"error": f"Tenant '{tenant_id}' not found"}), 404
         
-        # Get file info
         mtime = os.path.getmtime(tenant_config_path)
         created_at = datetime.fromtimestamp(mtime).isoformat() + "Z"
         
@@ -522,7 +503,7 @@ def delete_tenant(tenant_id):
                     "push"
                 ], check=True, capture_output=True, text=True)
             except subprocess.CalledProcessError:
-                pass  # Push might fail in local development
+                pass  
             
             git_success = True
         except subprocess.CalledProcessError as e:
@@ -563,7 +544,6 @@ def health_check():
     })
 
 if __name__ == '__main__':
-    # Initialize Git repository if it doesn't exist
     if not os.path.exists(os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '.git')):
         try:
             subprocess.run([
