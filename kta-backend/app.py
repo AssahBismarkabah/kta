@@ -39,7 +39,7 @@ ORGANIZATIONS_REALM = os.getenv('ORGANIZATIONS_REALM', 'kta-organizations')
 
 TENANT_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'tenant-template.yaml')
 SIMPLE_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'simple-tenant-template.yaml')
-ORG_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'organization-template.yaml')
+ORG_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'organization-template.yaml.j2')
 ORG_REALM_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'organizations-realm-template.yaml')
 TENANTS_DIR = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, 'tenants')
 ORGS_DIR = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, 'organizations')

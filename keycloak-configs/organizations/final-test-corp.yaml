@@ -1,0 +1,22 @@
+realm: kta-organizations
+organizations:
+- name: Final Test Corp
+  alias: final-test-corp
+  enabled: true
+  description: Organization for Final Test Corp
+  attributes:
+    industry:
+    - Quality Assurance
+    region:
+    - Global
+  domains:
+  - name: final-test.com
+    verified: false
+  members:
+  - username: admin@final-test-corp.com
+    firstName: Final
+    lastName: Test
+    email: admin@final-test-corp.com
+    enabled: true
+    realmRoles:
+    - org_admin

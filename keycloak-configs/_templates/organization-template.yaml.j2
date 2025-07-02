@@ -13,8 +13,11 @@ organizations:
         - "{{ industry | default('Technology') }}"
       region:
         - "{{ region | default('Global') }}"
-    domains: |
-      [{% for domain in domains %}{"name": "{{ domain.name }}", "verified": {{ domain.verified | default(false) | tojson }}}{%- if not loop.last %}, {% endif %}{% endfor %}]
+    domains:
+      {%- for domain in domains %}
+      - name: "{{ domain.name }}"
+        verified: {{ domain.verified | default(false) | tojson }}
+      {%- endfor %}
     members:
       - username: "{{ admin_email }}"
         firstName: "{{ admin_first_name }}"
