@@ -1,0 +1,56 @@
+# KTA Organizations Realm Template
+# This template creates a single realm that will host multiple organizations.
+# Organizations are defined in separate files and merged at apply-time.
+
+realm: "kta-organizations"
+enabled: true
+displayName: "KTA Multi-Tenant Organizations"
+
+# Enable Organizations feature
+attributes:
+  "organizationsEnabled": "true"
+
+# Other realm settings...
+registrationAllowed: false
+registrationEmailAsUsername: true
+rememberMe: true
+verifyEmail: true
+loginWithEmailAllowed: true
+duplicateEmailsAllowed: false
+resetPasswordAllowed: true
+editUsernameAllowed: false
+bruteForceProtected: true
+accessTokenLifespan: 300
+ssoSessionIdleTimeout: 1800
+ssoSessionMaxLifespan: 36000
+internationalizationEnabled: true
+supportedLocales:
+  - "en"
+  - "fr"
+  - "es"
+  - "de"
+defaultLocale: "en"
+passwordPolicy: "length(8) and digits(1) and lowerCase(1) and upperCase(1) and specialChars(1)"
+eventsEnabled: true
+eventsListeners:
+  - "jboss-logging"
+adminEventsEnabled: true
+adminEventsDetailsEnabled: true
+
+# Realm-level roles for organization management
+roles:
+  realm:
+    - name: "org_admin"
+      description: "Organization administrator role"
+    - name: "org_manager"
+      description: "Organization manager role"
+    - name: "org_user"
+      description: "Organization user role"
+    - name: "org_viewer"
+      description: "Organization viewer role"
+    - name: "kta_super_admin"
+      description: "KTA super administrator - can manage all organizations"
+
+# Placeholder for organizations.
+# This list will be populated by merging individual organization config files.
+organizations: [] 

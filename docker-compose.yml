@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.1.0
+    image: quay.io/keycloak/keycloak:26.1.2
     container_name: kta-keycloak
     environment:
       KEYCLOAK_ADMIN: admin
@@ -10,9 +10,10 @@ services:
       KC_HTTP_ENABLED: true
       KC_HOSTNAME_STRICT: false
       KC_HOSTNAME_STRICT_HTTPS: false
+      KC_FEATURES: organization
     ports:
       - "8080:8080"
-    command: start-dev
+    command: start-dev --features=organization
     volumes:
       - keycloak_data:/opt/keycloak/data
     networks:
@@ -22,17 +23,23 @@ services:
     build:
       context: .
       dockerfile: kta-backend/Dockerfile
+    image: kta-backend
     container_name: kta-backend
+    restart: unless-stopped
     ports:
-      - "5001:5001"
+      - "${KTA_BACKEND_PORT:-5001}:5001"
+    volumes:
+      - ./keycloak-configs:/app/keycloak-configs
+      - ./scripts:/app/scripts
     environment:
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_ADMIN_USER=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin123
       - KEYCLOAK_CONFIGS_REPO_PATH=/app/keycloak-configs
-    volumes:
-      - ./keycloak-configs:/app/keycloak-configs
-      - ./kta-backend:/app
+      - KTA_MODE=organizations
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO=${GITHUB_REPO}
+      - ORGANIZATIONS_REALM=${ORGANIZATIONS_REALM:-kta-organizations}
     depends_on:
       - keycloak
     networks:

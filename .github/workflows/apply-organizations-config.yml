@@ -1,0 +1,23 @@
+name: Apply Keycloak Organizations Configuration
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kta/keycloak-configs/organizations/**.yaml'
+  workflow_dispatch:
+
+jobs:
+  apply-config:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Apply All Organization Configurations
+        run: |
+          set -e
+          # The KTA_DIR is set inside the script based on its own location
+          ./kta/scripts/apply-organizations.sh
+        shell: bash

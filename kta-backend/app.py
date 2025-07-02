@@ -2,6 +2,10 @@
 kta Backend - Tenant Signup and Keycloak Configuration Automation
 This Flask application handles tenant signup requests and automatically generates
 Keycloak realm configurations using the tenant template.
+
+Updated to support both:
+1. Traditional realm-per-tenant mode
+2. New Keycloak Organizations mode (single realm, multiple organizations)
 """
 
 import os
@@ -9,6 +13,8 @@ import subprocess
 import uuid
 import secrets
 import string
+import requests
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -20,16 +26,92 @@ app = Flask(__name__)
 
 # Configuration
 KEYCLOAK_CONFIGS_REPO_PATH = os.getenv('KEYCLOAK_CONFIGS_REPO_PATH', '/app/keycloak-configs')
+KEYCLOAK_URL = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
+KEYCLOAK_ADMIN_USER = os.getenv('KEYCLOAK_ADMIN_USER', 'admin')
+KEYCLOAK_ADMIN_PASSWORD = os.getenv('KEYCLOAK_ADMIN_PASSWORD', 'admin123')
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
 GITHUB_REPO = os.getenv('GITHUB_REPO')
 PORT = int(os.getenv('PORT', 5001))
 
+# KTA Mode Configuration
+KTA_MODE = os.getenv('KTA_MODE', 'realm')  # 'realm' or 'organizations'
+ORGANIZATIONS_REALM = os.getenv('ORGANIZATIONS_REALM', 'kta-organizations')
+
 TENANT_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'tenant-template.yaml')
 SIMPLE_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'simple-tenant-template.yaml')
+ORG_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'organization-template.yaml')
+ORG_REALM_TEMPLATE_PATH = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, '_templates', 'organizations-realm-template.yaml')
 TENANTS_DIR = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, 'tenants')
+ORGS_DIR = os.path.join(KEYCLOAK_CONFIGS_REPO_PATH, 'organizations')
+APPLY_SCRIPT_PATH = os.path.join(os.path.dirname(KEYCLOAK_CONFIGS_REPO_PATH), 'scripts', 'apply-organizations.sh')
 
 # Ensure directories exist
 os.makedirs(TENANTS_DIR, exist_ok=True)
+os.makedirs(ORGS_DIR, exist_ok=True)
+
+class KeycloakClient:
+    """Keycloak Admin API client - limited to read-only operations for organizations mode"""
+    
+    def __init__(self):
+        self.base_url = KEYCLOAK_URL
+        self.admin_user = KEYCLOAK_ADMIN_USER
+        self.admin_password = KEYCLOAK_ADMIN_PASSWORD
+        self.token = None
+        self.token_expires = None
+    
+    def get_admin_token(self):
+        """Get admin access token"""
+        try:
+            token_url = f"{self.base_url}/realms/master/protocol/openid-connect/token"
+            data = {
+                'grant_type': 'password',
+                'client_id': 'admin-cli',
+                'username': self.admin_user,
+                'password': self.admin_password
+            }
+            
+            app.logger.debug(f"Getting token from: {token_url}")
+            response = requests.post(token_url, data=data)
+            response.raise_for_status()
+            
+            token_data = response.json()
+            self.token = token_data['access_token']
+            app.logger.debug("Successfully obtained admin token")
+            return self.token
+            
+        except Exception as e:
+            app.logger.error(f"Failed to get admin token: {e}")
+            app.logger.error(f"Token URL: {token_url}")
+            app.logger.error(f"Response status: {response.status_code if 'response' in locals() else 'No response'}")
+            return None
+    
+    def get_headers(self):
+        """Get authorization headers"""
+        # Always get a fresh token to avoid expiration issues
+        token = self.get_admin_token()
+        if not token:
+            raise Exception("Failed to get admin token")
+        
+        return {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+    
+    def list_organizations(self, realm_name):
+        """List all organizations in a realm"""
+        try:
+            url = f"{self.base_url}/admin/realms/{realm_name}/organizations"
+            
+            response = requests.get(url, headers=self.get_headers())
+            response.raise_for_status()
+            
+            return {'success': True, 'organizations': response.json()}
+            
+        except Exception as e:
+            app.logger.error(f"Failed to list organizations: {e}")
+            return {'success': False, 'error': str(e), 'organizations': []}
+
+keycloak_client = KeycloakClient()
 
 def setup_git_credentials():
     """Setup git credentials for authenticated push operations"""
@@ -54,7 +136,7 @@ setup_git_credentials()
 
 def generate_secure_password(length=16):
     """Generate a secure random password"""
-    alphabet = string.ascii_letters + string.digits + "!@#$"
+    alphabet = string.ascii_letters + string.digits + "l!@#$"
     password = ''.join(secrets.choice(alphabet) for _ in range(length))
     return password
 
@@ -77,43 +159,55 @@ def validate_tenant_id(tenant_id):
 def check_tenant_exists(tenant_id):
     """Check if tenant configuration already exists"""
     tenant_config_path = os.path.join(TENANTS_DIR, f"{tenant_id}.yaml")
-    return os.path.exists(tenant_config_path)
+    org_config_path = os.path.join(ORGS_DIR, f"{tenant_id}.yaml")
+    return os.path.exists(tenant_config_path) or os.path.exists(org_config_path)
 
-def git_operations(tenant_id, action="add"):
-    """Perform Git operations for tenant configuration"""
+def git_operations(entity_id, action="add"):
+    """
+    Performs git operations (add, commit, push) for a new config file.
+    Action can be 'add' for tenants or 'add_org' for organizations.
+    """
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        app.logger.warning("GITHUB_TOKEN or GITHUB_REPO not set. Skipping git operations.")
+        return False, "Git credentials not configured."
+
     try:
-        tenant_filename = f"{tenant_id}.yaml"
+        setup_git_credentials()
+
+        repo_path = Path(KEYCLOAK_CONFIGS_REPO_PATH).parent
         
-        if action == "add":
-            subprocess.run([
-                "git", "-C", KEYCLOAK_CONFIGS_REPO_PATH, 
-                "add", f"tenants/{tenant_filename}"
-            ], check=True, capture_output=True, text=True)
-            
-            commit_message = f"feat: Add tenant configuration for {tenant_id}"
-            subprocess.run([
-                "git", "-C", KEYCLOAK_CONFIGS_REPO_PATH,
-                "commit", "-m", commit_message
-            ], check=True, capture_output=True, text=True)
-            
-            # Push to remote
-            push_result = subprocess.run([
-                "git", "-C", KEYCLOAK_CONFIGS_REPO_PATH,
-                "push", "origin", "main"
-            ], capture_output=True, text=True)
-            
-            if push_result.returncode != 0:
-                app.logger.warning(f"Git push failed: {push_result.stderr}")
-                if not GITHUB_TOKEN or not GITHUB_REPO:
-                    app.logger.info("Git push failed - check GITHUB_TOKEN and GITHUB_REPO environment variables")
-                return True, "Committed locally but push failed - check Git configuration"
+        if action == "add_org":
+            file_path = f"keycloak-configs/organizations/{entity_id}.yaml"
+            commit_message = f"feat: add organization {entity_id}"
+        else: # Default to tenant
+            file_path = f"keycloak-configs/tenants/{entity_id}.yaml"
+            commit_message = f"feat: add tenant {entity_id}"
+
+        # Git commands
+        subprocess.run(["git", "config", "--global", "user.email", "kta-backend@example.com"], cwd=repo_path, check=True)
+        subprocess.run(["git", "config", "--global", "user.name", "KTA Backend"], cwd=repo_path, check=True)
+        subprocess.run(["git", "pull", "--rebase"], cwd=repo_path, check=True)
+        subprocess.run(["git", "add", file_path], cwd=repo_path, check=True)
         
+        # Check if there are changes to commit
+        status_result = subprocess.run(["git", "status", "--porcelain"], cwd=repo_path, check=True, capture_output=True, text=True)
+        if not status_result.stdout:
+            app.logger.info("No changes to commit. Working tree clean.")
+            return True, "No changes to commit."
+
+        subprocess.run(["git", "commit", "-m", commit_message], cwd=repo_path, check=True)
+        subprocess.run(["git", "push", f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"], cwd=repo_path, check=True)
+        
+        app.logger.info(f"Successfully committed and pushed {file_path}")
         return True, None
-    
     except subprocess.CalledProcessError as e:
-        error_msg = f"Git operation failed: {e.stderr if e.stderr else str(e)}"
-        app.logger.error(error_msg)
-        return False, error_msg
+        app.logger.error(f"Git operation failed: {e}")
+        app.logger.error(f"Stderr: {e.stderr}")
+        app.logger.error(f"Stdout: {e.stdout}")
+        return False, str(e)
+    except Exception as e:
+        app.logger.error(f"An unexpected error occurred during git operation: {e}")
+        return False, str(e)
 
 @app.route('/')
 def index():
@@ -524,6 +618,158 @@ def delete_tenant(tenant_id):
             "details": str(e) if app.debug else None
         }), 500
 
+# Organizations Mode Endpoints
+
+@app.route('/api/organizations/signup', methods=['POST'])
+def signup_organization():
+    """
+    Handles organization signup by generating a declarative configuration file
+    from a template and saving it to the organizations directory.
+    """
+    if KTA_MODE != 'organizations':
+        return jsonify({
+            "success": False,
+            "error": "Backend not in organizations mode"
+        }), 400
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "Invalid JSON"}), 400
+
+    required_fields = ['org_name', 'org_alias', 'admin_email', 'admin_first_name', 'admin_last_name', 'domains']
+    if not all(field in data for field in required_fields):
+        return jsonify({"success": False, "error": f"Missing one or more required fields: {required_fields}"}), 400
+
+    org_alias = data['org_alias']
+    if not validate_tenant_id(org_alias):
+        return jsonify({
+            "success": False,
+            "error": "Invalid organization alias. Use lowercase letters, numbers, and hyphens."
+        }), 400
+
+    org_config_path = Path(ORGS_DIR) / f"{org_alias}.yaml"
+    if org_config_path.exists():
+        return jsonify({"success": False, "error": "Organization already exists"}), 409
+
+    try:
+        with open(ORG_TEMPLATE_PATH) as f:
+            template = Template(f.read())
+        
+        # Ensure domains is a list of objects
+        domains = data.get('domains', [])
+        if domains and isinstance(domains[0], str):
+            data['domains'] = [{'name': d} for d in domains]
+
+        rendered_config_str = template.render(data)
+
+        # The 'domains' field is rendered as a string, so we need to parse it back
+        # into the structure before saving the final YAML.
+        rendered_config = yaml.safe_load(rendered_config_str)
+        if 'domains' in rendered_config and isinstance(rendered_config['domains'], str):
+             rendered_config['domains'] = yaml.safe_load(rendered_config['domains'])
+        
+        # Save the new organization file
+        with open(org_config_path, 'w') as f:
+            yaml.dump(rendered_config, f, sort_keys=False)
+        
+        app.logger.info(f"Successfully created organization config file: {org_config_path}")
+
+        # Git operations to commit and push the new organization file
+        git_success, git_error = git_operations(org_alias, "add_org")
+
+        response_data = {
+            "success": True,
+            "message": f"Organization '{org_alias}' configuration created successfully.",
+            "org_alias": org_alias,
+            "git_committed": git_success
+        }
+
+        if not git_success:
+            response_data["git_warning"] = f"Config file saved, but Git operation failed: {git_error}"
+            # Still return a success because the file was created
+            return jsonify(response_data), 201
+            
+    except Exception as e:
+        app.logger.error(f"Failed to render or save organization template: {e}")
+        return jsonify({"success": False, "error": "Failed to process organization template"}), 500
+            
+    return jsonify(response_data), 201
+
+@app.route('/api/organizations', methods=['GET'])
+def list_organizations():
+    """List all organizations (from both local configs and Keycloak)"""
+    try:
+        organizations = []
+        
+        # Get organizations from local config files
+        if os.path.exists(TENANTS_DIR):
+            for filename in os.listdir(TENANTS_DIR):
+                if filename.endswith('_org.yaml'):
+                    tenant_id = filename[:-9]  # Remove _org.yaml extension
+                    org_path = os.path.join(TENANTS_DIR, filename)
+                    
+                    try:
+                        with open(org_path, 'r') as f:
+                            config = yaml.safe_load(f)
+                        
+                        mtime = os.path.getmtime(org_path)
+                        created_at = datetime.fromtimestamp(mtime).isoformat() + "Z"
+                        
+                        organizations.append({
+                            "tenant_id": tenant_id,
+                            "tenant_name": config.get('tenant_name'),
+                            "mode": "organizations",
+                            "realm": config.get('realm', ORGANIZATIONS_REALM),
+                            "organization_id": config.get('keycloak_org_id'),
+                            "admin_email": config.get('admin_email'),
+                            "domain": config.get('tenant_domain'),
+                            "config_file": f"tenants/{filename}",
+                            "created_at": created_at
+                        })
+                    except Exception as e:
+                        app.logger.warning(f"Failed to load organization config {filename}: {e}")
+        
+        # Optionally get live data from Keycloak
+        if KTA_MODE == 'organizations':
+            try:
+                keycloak_orgs = keycloak_client.list_organizations(ORGANIZATIONS_REALM)
+                if keycloak_orgs['success']:
+                    # Here you could merge/compare with Keycloak data
+                    pass
+            except Exception as e:
+                app.logger.warning(f"Failed to fetch organizations from Keycloak: {e}")
+        
+        return jsonify({
+            "organizations": sorted(organizations, key=lambda x: x['created_at'], reverse=True),
+            "total_count": len(organizations),
+            "mode": KTA_MODE,
+            "realm": ORGANIZATIONS_REALM if KTA_MODE == 'organizations' else None
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Error listing organizations: {str(e)}")
+        return jsonify({
+            "error": "Failed to list organizations",
+            "details": str(e) if app.debug else None
+        }), 500
+
+@app.route('/api/mode', methods=['GET'])
+def get_mode():
+    """Get current KTA mode and configuration"""
+    return jsonify({
+        "mode": KTA_MODE,
+        "organizations_realm": ORGANIZATIONS_REALM if KTA_MODE == 'organizations' else None,
+        "keycloak_url": KEYCLOAK_URL,
+        "supports_realm_per_tenant": True,
+        "supports_organizations": True,
+        "current_config": {
+            "realm_template_exists": os.path.exists(TENANT_TEMPLATE_PATH),
+            "simple_template_exists": os.path.exists(SIMPLE_TEMPLATE_PATH),
+            "org_template_exists": os.path.exists(ORG_TEMPLATE_PATH),
+            "org_realm_template_exists": os.path.exists(ORG_REALM_TEMPLATE_PATH)
+        }
+    })
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -531,12 +777,17 @@ def health_check():
         "status": "healthy",
         "service": "kta-backend",
         "timestamp": datetime.utcnow().isoformat() + "Z",
+        "mode": KTA_MODE,
         "template_exists": os.path.exists(TENANT_TEMPLATE_PATH),
         "simple_template_exists": os.path.exists(SIMPLE_TEMPLATE_PATH),
+        "org_template_exists": os.path.exists(ORG_TEMPLATE_PATH),
         "tenants_dir_exists": os.path.exists(TENANTS_DIR),
         "git_configured": bool(GITHUB_TOKEN and GITHUB_REPO),
+        "keycloak_url": KEYCLOAK_URL,
         "environment": {
             "PORT": PORT,
+            "KTA_MODE": KTA_MODE,
+            "ORGANIZATIONS_REALM": ORGANIZATIONS_REALM,
             "GITHUB_REPO": GITHUB_REPO,
             "GITHUB_TOKEN_SET": bool(GITHUB_TOKEN),
             "REPO_PATH": KEYCLOAK_CONFIGS_REPO_PATH

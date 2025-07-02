@@ -1,0 +1,36 @@
+realm: "kta-organizations"
+organizations:
+  - name: "Acme Corporation"
+    alias: "acme-corp"
+    enabled: true
+    description: "Organization for Acme Corporation"
+    attributes:
+      industry:
+        - "Manufacturing"
+      region:
+        - "North America"
+    domains:
+      - name: "acme-corp.com"
+      - name: "acme.com"
+    members:
+      - username: "admin@acme-corp.com"
+        firstName: "John"
+        lastName: "Doe"
+        email: "admin@acme-corp.com"
+        enabled: true
+        realmRoles:
+          - "org_admin"
+      - username: "manager@acme-corp.com"
+        firstName: "Jane"
+        lastName: "Smith"
+        email: "manager@acme-corp.com"
+        enabled: true
+        realmRoles:
+          - "org_manager"
+      - username: "user@acme-corp.com"
+        firstName: "Bob"
+        lastName: "Johnson"
+        email: "user@acme-corp.com"
+        enabled: true
+        realmRoles:
+          - "org_user" 

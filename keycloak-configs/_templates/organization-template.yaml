@@ -1,0 +1,25 @@
+# KTA Organization Template
+# This template creates a self-contained configuration file for a single organization
+# that can be directly applied by keycloak-config-cli.
+
+realm: "kta-organizations"
+organizations:
+  - name: "{{ org_name }}"
+    alias: "{{ org_alias }}"
+    enabled: true
+    description: "Organization for {{ org_name }}"
+    attributes:
+      industry:
+        - "{{ industry | default('Technology') }}"
+      region:
+        - "{{ region | default('Global') }}"
+    domains: |
+      [{% for domain in domains %}{"name": "{{ domain.name }}", "verified": {{ domain.verified | default(false) | tojson }}}{%- if not loop.last %}, {% endif %}{% endfor %}]
+    members:
+      - username: "{{ admin_email }}"
+        firstName: "{{ admin_first_name }}"
+        lastName: "{{ admin_last_name }}"
+        email: "{{ admin_email }}"
+        enabled: true
+        realmRoles:
+          - "org_admin" 

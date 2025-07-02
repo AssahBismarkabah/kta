@@ -1,0 +1,21 @@
+realm: "kta-organizations"
+organizations:
+  - name: "TechCorp Solutions"
+    alias: "techcorp"
+    enabled: true
+    description: "Organization for TechCorp Solutions"
+    attributes:
+      industry:
+        - "Technology"
+      region:
+        - "North America"
+    domains:
+      - name: "techcorp.io"
+    members:
+      - username: "admin@techcorp.io"
+        firstName: "Tech"
+        lastName: "Admin"
+        email: "admin@techcorp.io"
+        enabled: true
+        realmRoles:
+          - "org_admin" 
